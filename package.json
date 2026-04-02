@@ -6,7 +6,10 @@
 		"n8n-community-node-package"
 	],
 	"license": "MIT",
-	"homepage": "",
+	"homepage": "https://github.com/inwendo/n8n-nodes-inwendo-erp",
+	"engines": {
+		"node": ">=18.0.0"
+	},
 	"author": {
 		"name": "inwendo GmbH"
 	},
@@ -14,7 +17,6 @@
 		"type": "git",
 		"url": "https://github.com/inwendo/n8n-nodes-inwendo-erp.git"
 	},
-	"main": "index.js",
 	"scripts": {
 		"build": "tsc && gulp build:icons",
 		"dev": "tsc --watch",
@@ -40,11 +42,11 @@
 		"@typescript-eslint/parser": "^7.0.0",
 		"eslint": "^8.56.0",
 		"gulp": "^5.0.1",
-		"n8n-workflow": "*",
+		"n8n-workflow": ">=1.0.0",
 		"prettier": "^3.2.0",
 		"typescript": "^5.3.0"
 	},
 	"peerDependencies": {
-		"n8n-workflow": "*"
+		"n8n-workflow": ">=1.0.0"
 	}
 }
