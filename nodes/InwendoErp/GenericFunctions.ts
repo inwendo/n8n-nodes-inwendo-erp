@@ -27,6 +27,11 @@ export async function inwendoErpApiRequest(
 		uri: `${host}${endpoint}`,
 		headers: {
 			'Content-Type': 'application/json',
+			// Identify requests coming from this n8n node so the ERP can
+			// suppress webhook dispatches back to n8n (webhooks whose
+			// notificationClientId === 'n8n') and avoid an infinite
+			// trigger -> workflow -> update -> trigger loop.
+			'X-IW-Trigger-Source': 'n8n',
 		},
 		qs: qs || {},
 		json: true,
@@ -66,6 +71,7 @@ export async function inwendoErpApiRequestAllItems(
 		uri: `${host}${endpoint}`,
 		headers: {
 			'Content-Type': 'application/json',
+			'X-IW-Trigger-Source': 'n8n',
 		},
 		qs: queryParams,
 		json: true,
