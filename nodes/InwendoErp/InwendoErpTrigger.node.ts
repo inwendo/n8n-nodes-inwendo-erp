@@ -50,9 +50,8 @@ export class InwendoErpTrigger implements INodeType {
 			},
 			{
 				displayName:
-					'Auto-registration requires the JWT token configured above to have: ' +
-					'Scope <b>Webhook</b> with <b>Write</b> access, <b>Allow admin functions</b> enabled, ' +
-					'and to be issued for a user whose access group is at least <b>Admin</b>. ' +
+					'Auto-registration requires the JWT token configured above to have ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access. ' +
 					'See the package Readme for details.',
 				name: 'autoRegisterNotice',
 				type: 'notice',
@@ -124,34 +123,22 @@ export class InwendoErpTrigger implements INodeType {
 
 				const staticData = this.getWorkflowStaticData('node');
 				const webhookId = staticData.webhookId as number | undefined;
-				if (!webhookId) {
+				const storedUrl = staticData.webhookUrl as string | undefined;
+				if (!webhookId || !storedUrl) {
 					return false;
 				}
 
-				try {
-					const response = await inwendoErpApiRequest.call(
-						this,
-						'GET',
-						`/api/dw/webhook/${webhookId}`,
-					);
-					const data = response?.data;
-					if (!data || data.deleted) {
-						delete staticData.webhookId;
-						return false;
-					}
-
-					// Force recreate if the URL changed (e.g. the workflow was
-					// moved to a different n8n host).
-					const currentUrl = this.getNodeWebhookUrl('default');
-					if (data.notificationUrl !== currentUrl) {
-						delete staticData.webhookId;
-						return false;
-					}
-					return true;
-				} catch (error) {
+				// Force recreate if the URL changed (e.g. the workflow was
+				// moved to a different n8n host or the test/prod URL flipped).
+				// Filter changes are absorbed server-side by the idempotent
+				// /api/n8n/webhook endpoint, so we do not need to compare
+				// entityType / action here.
+				if (storedUrl !== this.getNodeWebhookUrl('default')) {
 					delete staticData.webhookId;
+					delete staticData.webhookUrl;
 					return false;
 				}
+				return true;
 			},
 
 			async create(this: IHookFunctions): Promise<boolean> {
@@ -187,33 +174,21 @@ export class InwendoErpTrigger implements INodeType {
 					staticData.generatedToken = token;
 				}
 
-				const workflow = this.getWorkflow();
-				const nodeName = this.getNode().name;
-				const workflowName = (workflow?.name as string | undefined) ?? 'workflow';
-
 				const body: IDataObject = {
-					data: {
-						description: `n8n: ${workflowName} / ${nodeName}`,
-						deleted: false,
-						referenceClassName: entityType === 'all' ? null : entityType,
-						referenceIds: null,
-						databaseAction: action === 'all' ? null : action,
-						notificationType: 'HTTP_POST',
-						notificationUrl: webhookUrl,
-						notificationClientId: 'n8n',
-						notificationClientToken: token,
-						requestTimeout: 30,
-					},
+					webhook_url: webhookUrl,
+					reference_class_name: entityType === 'all' ? null : entityType,
+					database_action: action === 'all' ? null : action,
+					webhook_token: token,
 				};
 
 				const response = await inwendoErpApiRequest.call(
 					this,
 					'POST',
-					'/api/dw/webhook',
+					'/api/n8n/webhook',
 					body,
 				);
 
-				const webhookId = response?.data?.id;
+				const webhookId = response?.webhook_id;
 				if (!webhookId) {
 					throw new NodeOperationError(
 						this.getNode(),
@@ -221,6 +196,7 @@ export class InwendoErpTrigger implements INodeType {
 					);
 				}
 				staticData.webhookId = webhookId;
+				staticData.webhookUrl = webhookUrl;
 				return true;
 			},
 
@@ -234,27 +210,30 @@ export class InwendoErpTrigger implements INodeType {
 				}
 
 				const staticData = this.getWorkflowStaticData('node');
-				const webhookId = staticData.webhookId as number | undefined;
-				if (!webhookId) {
+				const webhookUrl =
+					(staticData.webhookUrl as string | undefined) ??
+					(this.getNodeWebhookUrl('default') as string);
+				if (!webhookUrl) {
 					return true;
 				}
 
 				try {
 					await inwendoErpApiRequest.call(
 						this,
-						'PATCH',
-						`/api/dw/webhook/${webhookId}`,
-						{ data: { deleted: true } },
+						'DELETE',
+						'/api/n8n/webhook',
+						{ webhook_url: webhookUrl },
 					);
 				} catch (error) {
-					// PATCH failed (e.g. transient ERP error). Keep
-					// staticData.webhookId so the next deactivation can retry
+					// DELETE failed (e.g. transient ERP error). Keep the
+					// stored static data so the next deactivation can retry
 					// cleanup, and do not block workflow deactivation.
 					return true;
 				}
 
 				// Only clear static data after a successful soft-delete.
 				delete staticData.webhookId;
+				delete staticData.webhookUrl;
 				delete staticData.generatedToken;
 				return true;
 			},
