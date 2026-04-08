@@ -46,11 +46,13 @@ When creating the API access token in the ERP (**Settings → API Access Tokens
 
 | Setting | Required value | Why |
 |---|---|---|
-| **Scope → Webhook** | **Write** | All `POST`/`PATCH`/`GET` endpoints on `/api/dw/webhook` are annotated `userAccessType=Write` — read alone is not enough, even for the `GET` calls the Trigger node uses in `checkExists`. |
-| **Allow admin functions** | **Enabled** | `RegisteredWebhookController` calls `checkAdmin()` on every action; for JWT auth this fails unless the token has `allowAdmin = true`. |
-| **User access group** | **at least Admin** | `checkAdmin()` also verifies that the token's user belongs to a group with `isAtLeastAdmin()`. |
+| **Scope → Webhook** | **Write** | `POST` and `DELETE` on `/api/n8n/webhook` are annotated `userAccessType=Write`. |
 | **Expiration** | Long-lived | The plugin has no refresh flow, so a short TTL will silently break webhook registration on the next activation. |
-| **URL path restriction** *(optional hardening)* | `/api/dw/webhook*` | Least-privilege — the Trigger node only touches that prefix for auto-registration. |
+| **URL path restriction** *(optional hardening)* | `/api/n8n/webhook*` | Least-privilege — the Trigger node only touches that prefix for auto-registration. |
+
+> **ERP version:** auto-registration requires an ERP build that ships the
+> dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
+> still need to use the manual setup path below.
 
 Those requirements apply only to the **auto-registration** feature of the
 Trigger node. If the same credential is also used by the **action node** to
@@ -58,11 +60,11 @@ read or write data (e.g. `/api/crm/crmcompanies`, `/api/invoice/invoices`,
 …), grant the corresponding per-resource scopes in addition to Webhook — that
 is unrelated to webhook auto-registration.
 
-If you prefer not to grant admin rights to this token, switch **Auto
-Register Webhook in ERP** off on the Trigger node and create the
-`RegisteredWebhook` in the ERP UI manually (see [Manual setup](#manual-setup-advanced)
-below). In that mode the token only needs the scopes for the resources the
-action node actually calls.
+If your ERP build is too old (no `/api/n8n/webhook`) or you simply prefer to
+manage the webhook yourself, switch **Auto Register Webhook in ERP** off on
+the Trigger node and create the `RegisteredWebhook` in the ERP UI manually
+(see [Manual setup](#manual-setup-advanced) below). In that mode the token
+only needs the scopes for the resources the action node actually calls.
 
 ## Installation
 
@@ -104,15 +106,27 @@ To trigger n8n workflows from ERP events:
 With **Auto Register Webhook in ERP** enabled (the default), activating the
 workflow will:
 
-- call `POST /api/dw/webhook` in the ERP to register a new `RegisteredWebhook`
-  pointing at n8n's production webhook URL, scoped to the selected entity
-  type and action
+- call `POST /api/n8n/webhook` on the ERP to register (or update) a
+  `RegisteredWebhook` row scoped to `notificationClientId = 'n8n'`,
+  pointing at n8n's production webhook URL and filtered by the selected
+  entity type and action
 - generate a random `notificationClientToken` (if you did not set one
   manually) and persist it with the workflow so that incoming requests are
   always validated against the `X-IW-Webhook-Token` header
 
-Deactivating the workflow soft-deletes the ERP webhook via
-`PATCH /api/dw/webhook/{id}` with `deleted: true`, so it will no longer fire.
+Deactivating the workflow calls `DELETE /api/n8n/webhook` with the same
+`webhook_url`, which soft-deletes every matching `n8n`-owned row so it no
+longer fires.
+
+The `POST /api/n8n/webhook` endpoint is **idempotent** on
+`(webhook_url, notificationClientId = 'n8n')`: if you edit the trigger's
+entity type, action, or webhook token and re-activate, the existing row is
+updated in place instead of creating a duplicate.
+
+> **ERP version:** this flow requires an ERP build that ships the
+> dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
+> do not support auto-registration and must use the manual setup below with
+> **Auto Register Webhook in ERP** disabled on the trigger.
 
 ### Manual setup (advanced)
 
