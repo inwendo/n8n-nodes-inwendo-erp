@@ -41,6 +41,26 @@ const RESOURCE_ENDPOINTS: Record<string, string> = {
 };
 
 /**
+ * Map of resource names to the Symfony form block prefix expected by the
+ * ERP API. POST/PATCH/PUT bodies must be wrapped under this key so that
+ * $form->handleRequest() reads them correctly on the server side.
+ */
+const RESOURCE_BLOCK_PREFIXES: Record<string, string> = {
+	company: 'crmcompany',
+	person: 'crmperson',
+	project: 'crmproject',
+	ticket: 'ticket',
+	timeEntry: 'time_entry',
+	invoice: 'invoice',
+	offer: 'offer',
+	booking: 'data',
+	event: 'data',
+	eventSignUp: 'data',
+	newsArticle: 'data',
+	webhook: 'data',
+};
+
+/**
  * Map of resource names to the field name that holds their ID parameter.
  */
 const RESOURCE_ID_FIELDS: Record<string, string> = {
@@ -369,7 +389,7 @@ export class InwendoErp implements INodeType {
 							this,
 							'POST',
 							basePath,
-							{ data: body },
+							{ [RESOURCE_BLOCK_PREFIXES[resource]]: body },
 						);
 						break;
 					}
@@ -391,7 +411,7 @@ export class InwendoErp implements INodeType {
 							this,
 							method,
 							`${basePath}/${id}`,
-							{ data: updateFields },
+							{ [RESOURCE_BLOCK_PREFIXES[resource]]: updateFields },
 						);
 						break;
 					}
