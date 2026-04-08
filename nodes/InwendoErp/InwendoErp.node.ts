@@ -97,7 +97,7 @@ export class InwendoErp implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'inwendo ERP',
 		name: 'inwendoErp',
-		icon: 'file:../../icons/inwendo.svg',
+		icon: 'file:../../icons/inwendo.png',
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',

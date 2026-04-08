@@ -25,7 +25,7 @@ jobs:
           test -f dist/nodes/InwendoErp/InwendoErp.node.js
           test -f dist/nodes/InwendoErp/InwendoErpTrigger.node.js
           test -f dist/nodes/InwendoErp/InwendoErp.node.json
-          test -f dist/icons/inwendo.svg
+          test -f dist/icons/inwendo.png
 
       - run: npm publish --access public
         env:
