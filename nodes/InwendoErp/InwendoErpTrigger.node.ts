@@ -6,6 +6,10 @@ import type {
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
+import { randomBytes } from 'crypto';
+
+import { inwendoErpApiRequest } from './GenericFunctions';
 
 export class InwendoErpTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -36,6 +40,29 @@ export class InwendoErpTrigger implements INodeType {
 			},
 		],
 		properties: [
+			{
+				displayName: 'Auto Register Webhook in ERP',
+				name: 'autoRegister',
+				type: 'boolean',
+				default: true,
+				description:
+					'Whether to automatically create the matching RegisteredWebhook in the inwendo ERP when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid inwendo ERP API credentials must be configured on this node.',
+			},
+			{
+				displayName:
+					'Auto-registration requires the JWT token configured above to have: ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access, <b>Allow admin functions</b> enabled, ' +
+					'and to be issued for a user whose access group is at least <b>Admin</b>. ' +
+					'See the package Readme for details.',
+				name: 'autoRegisterNotice',
+				type: 'notice',
+				default: '',
+				displayOptions: {
+					show: {
+						autoRegister: [true],
+					},
+				},
+			},
 			{
 				displayName: 'Entity Type',
 				name: 'entityType',
@@ -77,8 +104,9 @@ export class InwendoErpTrigger implements INodeType {
 				typeOptions: { password: true },
 				default: '',
 				description:
-					'If set, validates the X-IW-Webhook-Token header from incoming requests. ' +
-					'Must match the notificationClientToken configured on the webhook in the ERP.',
+					'Optional shared secret used to validate the X-IW-Webhook-Token header on incoming requests. ' +
+					'With auto-registration enabled, leave this empty to have a random token generated and stored with the workflow. ' +
+					'With auto-registration disabled, set it to the notificationClientToken configured on the webhook in the ERP.',
 			},
 		],
 	};
@@ -86,15 +114,148 @@ export class InwendoErpTrigger implements INodeType {
 	webhookMethods = {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
-				// Webhooks are manually configured in the ERP, so always return true
-				return true;
+				const autoRegister = this.getNodeParameter('autoRegister', true) as boolean;
+				if (!autoRegister) {
+					// The user is managing the webhook manually in the ERP, so
+					// there is nothing for us to check - pretend it exists so
+					// n8n does not call create().
+					return true;
+				}
+
+				const staticData = this.getWorkflowStaticData('node');
+				const webhookId = staticData.webhookId as number | undefined;
+				if (!webhookId) {
+					return false;
+				}
+
+				try {
+					const response = await inwendoErpApiRequest.call(
+						this,
+						'GET',
+						`/api/dw/webhook/${webhookId}`,
+					);
+					const data = response?.data;
+					if (!data || data.deleted) {
+						delete staticData.webhookId;
+						return false;
+					}
+
+					// Force recreate if the URL changed (e.g. the workflow was
+					// moved to a different n8n host).
+					const currentUrl = this.getNodeWebhookUrl('default');
+					if (data.notificationUrl !== currentUrl) {
+						delete staticData.webhookId;
+						return false;
+					}
+					return true;
+				} catch (error) {
+					delete staticData.webhookId;
+					return false;
+				}
 			},
+
 			async create(this: IHookFunctions): Promise<boolean> {
-				// Webhook registration happens in the ERP via the Webhook resource
+				const autoRegister = this.getNodeParameter('autoRegister', true) as boolean;
+				if (!autoRegister) {
+					// User is managing the webhook manually.
+					return true;
+				}
+
+				// Fail loudly if no ERP credentials are configured — otherwise
+				// getCredentials() inside inwendoErpApiRequest would throw a
+				// generic error. This message tells the user exactly what to do.
+				try {
+					await this.getCredentials('inwendoErpApi');
+				} catch {
+					throw new NodeOperationError(
+						this.getNode(),
+						'Auto Register Webhook in ERP is enabled but no inwendo ERP API credentials are configured on this trigger. Configure credentials on the node, or disable Auto Register Webhook in ERP to manage the webhook manually.',
+					);
+				}
+
+				const webhookUrl = this.getNodeWebhookUrl('default') as string;
+				const entityType = this.getNodeParameter('entityType') as string;
+				const action = this.getNodeParameter('action') as string;
+				let token = this.getNodeParameter('webhookToken', '') as string;
+
+				// If no token is supplied, auto-generate one and persist it in
+				// static data so webhook() can validate incoming requests with it.
+				const staticData = this.getWorkflowStaticData('node');
+				if (!token) {
+					token =
+						(staticData.generatedToken as string) || randomBytes(24).toString('hex');
+					staticData.generatedToken = token;
+				}
+
+				const workflow = this.getWorkflow();
+				const nodeName = this.getNode().name;
+				const workflowName = (workflow?.name as string | undefined) ?? 'workflow';
+
+				const body: IDataObject = {
+					data: {
+						description: `n8n: ${workflowName} / ${nodeName}`,
+						deleted: false,
+						referenceClassName: entityType === 'all' ? null : entityType,
+						referenceIds: null,
+						databaseAction: action === 'all' ? null : action,
+						notificationType: 'HTTP_POST',
+						notificationUrl: webhookUrl,
+						notificationClientId: 'n8n',
+						notificationClientToken: token,
+						requestTimeout: 30,
+					},
+				};
+
+				const response = await inwendoErpApiRequest.call(
+					this,
+					'POST',
+					'/api/dw/webhook',
+					body,
+				);
+
+				const webhookId = response?.data?.id;
+				if (!webhookId) {
+					throw new NodeOperationError(
+						this.getNode(),
+						'inwendo ERP did not return a webhook id after registration',
+					);
+				}
+				staticData.webhookId = webhookId;
 				return true;
 			},
+
 			async delete(this: IHookFunctions): Promise<boolean> {
-				// Webhook deletion happens in the ERP
+				const autoRegister = this.getNodeParameter('autoRegister', true) as boolean;
+				if (!autoRegister) {
+					// User is managing the webhook manually - do not touch
+					// anything in the ERP, and leave any stored static data
+					// alone in case they re-enable auto-registration later.
+					return true;
+				}
+
+				const staticData = this.getWorkflowStaticData('node');
+				const webhookId = staticData.webhookId as number | undefined;
+				if (!webhookId) {
+					return true;
+				}
+
+				try {
+					await inwendoErpApiRequest.call(
+						this,
+						'PATCH',
+						`/api/dw/webhook/${webhookId}`,
+						{ data: { deleted: true } },
+					);
+				} catch (error) {
+					// PATCH failed (e.g. transient ERP error). Keep
+					// staticData.webhookId so the next deactivation can retry
+					// cleanup, and do not block workflow deactivation.
+					return true;
+				}
+
+				// Only clear static data after a successful soft-delete.
+				delete staticData.webhookId;
+				delete staticData.generatedToken;
 				return true;
 			},
 		},
@@ -104,8 +265,13 @@ export class InwendoErpTrigger implements INodeType {
 		const body = this.getBodyData() as IDataObject;
 		const headerData = this.getHeaderData() as IDataObject;
 
-		// Validate webhook token if configured
-		const expectedToken = this.getNodeParameter('webhookToken', '') as string;
+		// Validate webhook token. Accept either the user-supplied token or
+		// the one that auto-registration stored in workflow static data.
+		const staticData = this.getWorkflowStaticData('node');
+		const expectedToken =
+			(this.getNodeParameter('webhookToken', '') as string) ||
+			(staticData.generatedToken as string) ||
+			'';
 		if (expectedToken) {
 			const receivedToken =
 				(headerData['x-iw-webhook-token'] as string) ||

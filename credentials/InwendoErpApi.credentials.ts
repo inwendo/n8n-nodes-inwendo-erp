@@ -11,6 +11,16 @@ export class InwendoErpApi implements ICredentialType {
 	documentationUrl = 'https://github.com/inwendo/n8n-nodes-inwendo-erp';
 	properties: INodeProperties[] = [
 		{
+			displayName:
+				'For webhook auto-registration (inwendo ERP Trigger) this token needs: ' +
+				'Scope <b>Webhook</b> with <b>Write</b> access, <b>Allow admin functions</b> enabled, ' +
+				'and it must be issued for a user whose access group is at least <b>Admin</b>. ' +
+				'For action-node use, also grant the scopes of the resources you plan to read or write.',
+			name: 'jwtNotice',
+			type: 'notice',
+			default: '',
+		},
+		{
 			displayName: 'ERP Host URL',
 			name: 'host',
 			type: 'string',
