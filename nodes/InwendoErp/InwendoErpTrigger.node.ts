@@ -49,6 +49,21 @@ export class InwendoErpTrigger implements INodeType {
 					'Whether to automatically create the matching RegisteredWebhook in the inwendo ERP when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid inwendo ERP API credentials must be configured on this node.',
 			},
 			{
+				displayName:
+					'Auto-registration requires the JWT token configured above to have: ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access, <b>Allow admin functions</b> enabled, ' +
+					'and to be issued for a user whose access group is at least <b>Admin</b>. ' +
+					'See the package Readme for details.',
+				name: 'autoRegisterNotice',
+				type: 'notice',
+				default: '',
+				displayOptions: {
+					show: {
+						autoRegister: [true],
+					},
+				},
+			},
+			{
 				displayName: 'Entity Type',
 				name: 'entityType',
 				type: 'options',
