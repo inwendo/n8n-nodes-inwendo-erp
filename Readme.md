@@ -106,15 +106,27 @@ To trigger n8n workflows from ERP events:
 With **Auto Register Webhook in ERP** enabled (the default), activating the
 workflow will:
 
-- call `POST /api/dw/webhook` in the ERP to register a new `RegisteredWebhook`
-  pointing at n8n's production webhook URL, scoped to the selected entity
-  type and action
+- call `POST /api/n8n/webhook` on the ERP to register (or update) a
+  `RegisteredWebhook` row scoped to `notificationClientId = 'n8n'`,
+  pointing at n8n's production webhook URL and filtered by the selected
+  entity type and action
 - generate a random `notificationClientToken` (if you did not set one
   manually) and persist it with the workflow so that incoming requests are
   always validated against the `X-IW-Webhook-Token` header
 
-Deactivating the workflow soft-deletes the ERP webhook via
-`PATCH /api/dw/webhook/{id}` with `deleted: true`, so it will no longer fire.
+Deactivating the workflow calls `DELETE /api/n8n/webhook` with the same
+`webhook_url`, which soft-deletes every matching `n8n`-owned row so it no
+longer fires.
+
+The `POST /api/n8n/webhook` endpoint is **idempotent** on
+`(webhook_url, notificationClientId = 'n8n')`: if you edit the trigger's
+entity type, action, or webhook token and re-activate, the existing row is
+updated in place instead of creating a duplicate.
+
+> **ERP version:** this flow requires an ERP build that ships the
+> dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
+> do not support auto-registration and must use the manual setup below with
+> **Auto Register Webhook in ERP** disabled on the trigger.
 
 ### Manual setup (advanced)
 

@@ -51,7 +51,10 @@ export class InwendoErpTrigger implements INodeType {
 			{
 				displayName:
 					'Auto-registration requires the JWT token configured above to have ' +
-					'Scope <b>Webhook</b> with <b>Write</b> access. ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access, and the inwendo ERP ' +
+					'instance must provide the dedicated <b>/api/n8n/webhook</b> ' +
+					'controller. Older ERP builds do not support this flow - turn ' +
+					'this toggle off and configure the webhook manually in the ERP UI. ' +
 					'See the package Readme for details.',
 				name: 'autoRegisterNotice',
 				type: 'notice',
@@ -114,31 +117,17 @@ export class InwendoErpTrigger implements INodeType {
 		default: {
 			async checkExists(this: IHookFunctions): Promise<boolean> {
 				const autoRegister = this.getNodeParameter('autoRegister', true) as boolean;
-				if (!autoRegister) {
-					// The user is managing the webhook manually in the ERP, so
-					// there is nothing for us to check - pretend it exists so
-					// n8n does not call create().
-					return true;
-				}
-
-				const staticData = this.getWorkflowStaticData('node');
-				const webhookId = staticData.webhookId as number | undefined;
-				const storedUrl = staticData.webhookUrl as string | undefined;
-				if (!webhookId || !storedUrl) {
-					return false;
-				}
-
-				// Force recreate if the URL changed (e.g. the workflow was
-				// moved to a different n8n host or the test/prod URL flipped).
-				// Filter changes are absorbed server-side by the idempotent
-				// /api/n8n/webhook endpoint, so we do not need to compare
-				// entityType / action here.
-				if (storedUrl !== this.getNodeWebhookUrl('default')) {
-					delete staticData.webhookId;
-					delete staticData.webhookUrl;
-					return false;
-				}
-				return true;
+				// In manual mode: pretend the webhook exists so n8n does not
+				// call create() - the user owns the ERP-side registration.
+				//
+				// In auto mode: always return false so n8n calls create() on
+				// every activation. POST /api/n8n/webhook is idempotent on
+				// (webhook_url, notificationClientId='n8n'), so any change to
+				// entityType / action / webhookToken is absorbed in place by
+				// the server. Returning false unconditionally avoids the
+				// class of bugs where a client-side comparison misses a
+				// parameter change and leaves the ERP webhook stale.
+				return !autoRegister;
 			},
 
 			async create(this: IHookFunctions): Promise<boolean> {
@@ -225,13 +214,16 @@ export class InwendoErpTrigger implements INodeType {
 						{ webhook_url: webhookUrl },
 					);
 				} catch (error) {
-					// DELETE failed (e.g. transient ERP error). Keep the
-					// stored static data so the next deactivation can retry
-					// cleanup, and do not block workflow deactivation.
+					// DELETE /api/n8n/webhook failed (e.g. transient ERP
+					// error). Keep the stored static data so the next
+					// deactivation can retry cleanup, and do not block
+					// workflow deactivation.
 					return true;
 				}
 
-				// Only clear static data after a successful soft-delete.
+				// Only clear static data after the DELETE succeeded. The
+				// ERP side soft-deletes the row; the trigger just needs to
+				// forget its local handle on it.
 				delete staticData.webhookId;
 				delete staticData.webhookUrl;
 				delete staticData.generatedToken;
