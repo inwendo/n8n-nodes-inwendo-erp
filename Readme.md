@@ -28,7 +28,7 @@ Perform CRUD operations on the following ERP resources:
 
 ### inwendo ERP Trigger
 
-Receives webhook events from the ERP when entities are created, updated, or deleted. Supports filtering by entity type and action.
+Receives webhook events from the ERP when entities are created, updated, or deleted. Supports filtering by entity type and action, and automatically registers/removes the matching webhook in the ERP when the workflow is activated/deactivated.
 
 ## Credentials
 
@@ -72,13 +72,36 @@ npm link n8n-nodes-inwendo-erp
 To trigger n8n workflows from ERP events:
 
 1. Add an **inwendo ERP Trigger** node to your workflow
-2. Activate the workflow and copy the **Production Webhook URL**
-3. In the ERP, create a `RegisteredWebhook` via the API or admin UI:
-   - `notificationType`: `HTTP_POST`
-   - `notificationUrl`: Paste the n8n webhook URL
-   - `referenceClassName`: Entity to watch (e.g., `CRMCompany`)
-   - `databaseAction`: `create`, `update`, or `delete`
-   - Optionally set `notificationClientToken` and configure the same token in the n8n trigger node
+2. Pick the **Entity Type** and **Action** you want to listen for
+3. Select or create an **inwendo ERP API** credential on the trigger node
+4. Activate the workflow
+
+With **Auto Register Webhook in ERP** enabled (the default), activating the
+workflow will:
+
+- call `POST /api/dw/webhook` in the ERP to register a new `RegisteredWebhook`
+  pointing at n8n's production webhook URL, scoped to the selected entity
+  type and action
+- generate a random `notificationClientToken` (if you did not set one
+  manually) and persist it with the workflow so that incoming requests are
+  always validated against the `X-IW-Webhook-Token` header
+
+Deactivating the workflow soft-deletes the ERP webhook via
+`PATCH /api/dw/webhook/{id}` with `deleted: true`, so it will no longer fire.
+
+### Manual setup (advanced)
+
+If you prefer to manage the webhook yourself (for example because multiple
+workflows share a single ERP webhook), switch **Auto Register Webhook in
+ERP** off on the trigger node. Then create a `RegisteredWebhook` in the ERP
+manually, either via the API or the admin UI:
+
+- `notificationType`: `HTTP_POST`
+- `notificationUrl`: The **Production Webhook URL** shown on the trigger node
+- `referenceClassName`: Entity to watch (e.g., `CRMCompany`)
+- `databaseAction`: `create`, `update`, or `delete`
+- Optionally set `notificationClientToken` and configure the same value in
+  the trigger node's **Webhook Token** field
 
 ### Webhook Payload Format
 
