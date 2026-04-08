@@ -161,6 +161,18 @@ export class InwendoErpTrigger implements INodeType {
 					return true;
 				}
 
+				// Fail loudly if no ERP credentials are configured — otherwise
+				// getCredentials() inside inwendoErpApiRequest would throw a
+				// generic error. This message tells the user exactly what to do.
+				try {
+					await this.getCredentials('inwendoErpApi');
+				} catch {
+					throw new NodeOperationError(
+						this.getNode(),
+						'Auto Register Webhook in ERP is enabled but no inwendo ERP API credentials are configured on this trigger. Configure credentials on the node, or disable Auto Register Webhook in ERP to manage the webhook manually.',
+					);
+				}
+
 				const webhookUrl = this.getNodeWebhookUrl('default') as string;
 				const entityType = this.getNodeParameter('entityType') as string;
 				const action = this.getNodeParameter('action') as string;
@@ -190,7 +202,7 @@ export class InwendoErpTrigger implements INodeType {
 						notificationUrl: webhookUrl,
 						notificationClientId: 'n8n',
 						notificationClientToken: token,
-						requestTimeout: 5,
+						requestTimeout: 30,
 					},
 				};
 
@@ -213,6 +225,14 @@ export class InwendoErpTrigger implements INodeType {
 			},
 
 			async delete(this: IHookFunctions): Promise<boolean> {
+				const autoRegister = this.getNodeParameter('autoRegister', true) as boolean;
+				if (!autoRegister) {
+					// User is managing the webhook manually - do not touch
+					// anything in the ERP, and leave any stored static data
+					// alone in case they re-enable auto-registration later.
+					return true;
+				}
+
 				const staticData = this.getWorkflowStaticData('node');
 				const webhookId = staticData.webhookId as number | undefined;
 				if (!webhookId) {
@@ -227,11 +247,13 @@ export class InwendoErpTrigger implements INodeType {
 						{ data: { deleted: true } },
 					);
 				} catch (error) {
-					// Swallow - leaving a stale soft-deleted entry behind is
-					// better than blocking workflow deactivation on a transient
-					// ERP error.
+					// PATCH failed (e.g. transient ERP error). Keep
+					// staticData.webhookId so the next deactivation can retry
+					// cleanup, and do not block workflow deactivation.
+					return true;
 				}
 
+				// Only clear static data after a successful soft-delete.
 				delete staticData.webhookId;
 				delete staticData.generatedToken;
 				return true;
