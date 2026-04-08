@@ -15,7 +15,7 @@ export class InwendoErpTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'inwendo ERP Trigger',
 		name: 'inwendoErpTrigger',
-		icon: 'file:../../icons/inwendo.svg',
+		icon: 'file:../../icons/inwendo.png',
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["entityType"] + " " + $parameter["action"]}}',
