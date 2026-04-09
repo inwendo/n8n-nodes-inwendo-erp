@@ -152,6 +152,13 @@ export const companyFields: INodeProperties[] = [
 				description: 'Secondary name of the company',
 			},
 			{
+				displayName: 'Category',
+				name: 'category',
+				type: 'string',
+				default: '',
+				description: 'Category of the company',
+			},
+			{
 				displayName: 'Is Customer',
 				name: 'isCustomer',
 				type: 'boolean',
@@ -391,6 +398,13 @@ export const companyFields: INodeProperties[] = [
 				name: 'secondaryName',
 				type: 'string',
 				default: '',
+			},
+			{
+				displayName: 'Category',
+				name: 'category',
+				type: 'string',
+				default: '',
+				description: 'Category of the company',
 			},
 			{
 				displayName: 'Is Customer',
