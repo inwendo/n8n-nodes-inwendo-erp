@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-inwendo-erp",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"description": "n8n community node for inwendo ERP integration",
 	"keywords": [
 		"n8n-community-node-package"
@@ -8,7 +8,7 @@
 	"license": "MIT",
 	"homepage": "https://github.com/inwendo/n8n-nodes-inwendo-erp",
 	"engines": {
-		"node": ">=18.0.0"
+		"node": ">=20.19"
 	},
 	"author": {
 		"name": "inwendo GmbH"
@@ -23,7 +23,9 @@
 		"format": "prettier nodes credentials --write",
 		"lint": "eslint nodes credentials package.json",
 		"lintfix": "eslint nodes credentials package.json --fix",
-		"prepublishOnly": "npm run build"
+		"prepublishOnly": "npm run build",
+		"test:e2e": "npm run build && node --test \"test/e2e/*.test.js\"",
+		"test": "npm run build && node --test \"test/unit/*.test.js\""
 	},
 	"files": [
 		"dist"
@@ -40,6 +42,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^18.19.130",
+		"@typescript-eslint/eslint-plugin": "^7.18.0",
 		"@typescript-eslint/parser": "^7.0.0",
 		"eslint": "^8.56.0",
 		"gulp": "^5.0.1",
@@ -48,6 +51,10 @@
 		"typescript": "^5.3.0"
 	},
 	"peerDependencies": {
-		"n8n-workflow": ">=1.0.0"
+		"n8n-workflow": "*"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

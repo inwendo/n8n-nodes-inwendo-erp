@@ -14,8 +14,8 @@ Perform CRUD operations on the following ERP resources:
 |----------|-----------|
 | Company | Get, Get Many, Create, Update (PATCH) |
 | Person | Get, Get Many, Create, Update (PATCH) |
-| Invoice | Get, Get Many, Create, Update, Get PDF |
-| Offer | Get, Get Many, Create, Update, Get PDF |
+| Invoice | Get, Get Many, Create, Get PDF (binary) |
+| Offer | Get, Get Many, Create, Get PDF (binary) |
 | Ticket | Get, Get Many, Create, Update (PATCH) |
 | Project | Get, Get Many, Create, Update (PATCH) |
 | Time Entry | Get, Get Many, Create, Update (PATCH) |
@@ -23,8 +23,16 @@ Perform CRUD operations on the following ERP resources:
 | Event | Get, Get Many, Create, Update (PATCH) |
 | Event Sign-Up | Get, Get Many, Create, Update (PATCH) |
 | News Article | Get, Get Many, Create, Update (PATCH) |
-| Webhook | Get, Get Many, Create, Update |
+| Webhook | Get, Get Many, Create, Update (PATCH) |
 | Generic API Request | Custom HTTP request to any ERP endpoint |
+
+Updates always use `PATCH`, so fields you do not set keep their value.
+Invoices and offers cannot be changed through the API once created; creating
+one needs the IDs of an accounting type, a tax, a payment goal (and for
+invoices a payment type) plus the buyer name. **Get PDF** returns the PDF as
+binary data (`data` property).
+
+The action node can also be used as a tool by AI agents (`usableAsTool`).
 
 ### inwendo ERP Trigger
 
@@ -48,7 +56,7 @@ When creating the API access token in the ERP (**Settings → API Access Tokens
 |---|---|---|
 | **Scope → Webhook** | **Write** | `POST` and `DELETE` on `/api/n8n/webhook` are annotated `userAccessType=Write`. |
 | **Expiration** | Long-lived | The plugin has no refresh flow, so a short TTL will silently break webhook registration on the next activation. |
-| **URL path restriction** *(optional hardening)* | `/api/n8n/webhook*` | Least-privilege — the Trigger node only touches that prefix for auto-registration. |
+| **URL path restriction** *(optional hardening)* | `/api/n8n/webhook` | Least-privilege — auto-registration only calls this exact path (`POST` and `DELETE`). A prefix is written with a trailing `.*` (e.g. `/api/n8n/.*`); `*` alone is not a wildcard. |
 
 > **ERP version:** auto-registration requires an ERP build that ships the
 > dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
@@ -58,13 +66,35 @@ Those requirements apply only to the **auto-registration** feature of the
 Trigger node. If the same credential is also used by the **action node** to
 read or write data (e.g. `/api/crm/crmcompanies`, `/api/invoice/invoices`,
 …), grant the corresponding per-resource scopes in addition to Webhook — that
-is unrelated to webhook auto-registration.
+is unrelated to webhook auto-registration:
+
+| Resource | Scopes |
+|---|---|
+| Company, Person | CRM |
+| Project | CRM, CRM Project |
+| Ticket | Ticket and Own Ticket; with the CRM Project scope a ticket needs a Project ID |
+| Time Entry | Time |
+| Invoice, Offer | Billing |
+| Booking, Event, Event Sign-Up | Event, Event Booking |
+| News Article | Media |
+| Webhook (action node) | Webhook and **Allow admin functions** |
+
+When the ERP rejects a request, the node error shows the ERP's error code and
+message (`X-IW-ERROR-CODE` / `X-IW-ERROR-JSON`).
 
 If your ERP build is too old (no `/api/n8n/webhook`) or you simply prefer to
 manage the webhook yourself, switch **Auto Register Webhook in ERP** off on
 the Trigger node and create the `RegisteredWebhook` in the ERP UI manually
 (see [Manual setup](#manual-setup-advanced) below). In that mode the token
 only needs the scopes for the resources the action node actually calls.
+
+## Compatibility
+
+Requires n8n 1.85 or newer (for `NodeConnectionTypes`), including n8n 2.x;
+built against n8n-workflow 2.x. The package uses the
+`httpRequestWithAuthentication` helper (the `request`-based helpers are
+deprecated and rejected by the community node linter) and is published with
+npm provenance, which n8n requires for verified community nodes.
 
 ## Installation
 
@@ -156,6 +186,19 @@ The ERP sends the following JSON payload:
   "data": { ... }
 }
 ```
+
+## Tests
+
+End-to-end tests run the compiled nodes against a real ERP instance (every
+operation of every resource, the credential test and the trigger's webhook
+registration). Without the variables they are skipped.
+
+```bash
+IW_E2E_ERP_HOST=https://erp.example.com IW_E2E_ERP_TOKEN=<jwt> npm run test:e2e
+```
+
+The token needs the scopes listed above plus "Allow admin functions". Set
+`IW_E2E_PDF=1` if the instance can render PDFs.
 
 ## API Endpoints
 

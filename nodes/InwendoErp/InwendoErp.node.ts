@@ -5,9 +5,13 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { inwendoErpApiRequest, inwendoErpApiRequestAllItems } from './GenericFunctions';
+import {
+	inwendoErpApiRequest,
+	inwendoErpApiRequestAllItems,
+	inwendoErpApiRequestBinary,
+} from './GenericFunctions';
 
 import { companyOperations, companyFields } from './descriptions/CompanyDescription';
 import { personOperations, personFields } from './descriptions/PersonDescription';
@@ -61,6 +65,16 @@ const RESOURCE_BLOCK_PREFIXES: Record<string, string> = {
 };
 
 /**
+ * Additional fields of invoices and offers that go into the nested `buyer` form.
+ */
+const BUYER_FIELDS: Record<string, string> = {
+	buyerSecondaryName: 'secondaryName',
+	buyerVatId: 'vatId',
+	buyerTaxnumber: 'taxnumber',
+	buyerReferenceId: 'buyerReferenceId',
+};
+
+/**
  * Map of resource names to the field name that holds their ID parameter.
  */
 const RESOURCE_ID_FIELDS: Record<string, string> = {
@@ -78,21 +92,6 @@ const RESOURCE_ID_FIELDS: Record<string, string> = {
 	webhook: 'webhookId',
 };
 
-/**
- * Resources that support PATCH for updates. Others use PUT.
- */
-const PATCH_SUPPORTED: Set<string> = new Set([
-	'company',
-	'person',
-	'project',
-	'ticket',
-	'timeEntry',
-	'booking',
-	'event',
-	'eventSignUp',
-	'newsArticle',
-]);
-
 export class InwendoErp implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'inwendo ERP',
@@ -105,8 +104,9 @@ export class InwendoErp implements INodeType {
 		defaults: {
 			name: 'inwendo ERP',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
 		credentials: [
 			{
 				name: 'inwendoErpApi',
@@ -333,7 +333,9 @@ export class InwendoErp implements INodeType {
 								qs,
 							);
 						} else {
+							// The ERP only honours pageSize together with a (0-based) page.
 							const limit = this.getNodeParameter('limit', i) as number;
+							qs.page = '0';
 							qs.pageSize = String(limit);
 							responseData = await inwendoErpApiRequest.call(
 								this,
@@ -342,6 +344,9 @@ export class InwendoErp implements INodeType {
 								undefined,
 								qs,
 							);
+							if (Array.isArray(responseData)) {
+								responseData = responseData.slice(0, limit);
+							}
 						}
 						break;
 					}
@@ -369,6 +374,19 @@ export class InwendoErp implements INodeType {
 							case 'timeEntry':
 								body.start = this.getNodeParameter('start', i) as string;
 								break;
+							case 'invoice':
+								body.accountingType = this.getNodeParameter('accountingType', i) as string;
+								body.tax = this.getNodeParameter('tax', i) as string;
+								body.paymentType = this.getNodeParameter('paymentType', i) as string;
+								body.paymentGoal = this.getNodeParameter('paymentGoal', i) as string;
+								body.buyer = { name: this.getNodeParameter('buyerName', i) as string };
+								break;
+							case 'offer':
+								body.offerAccountingType = this.getNodeParameter('offerAccountingType', i) as string;
+								body.tax = this.getNodeParameter('tax', i) as string;
+								body.paymentGoal = this.getNodeParameter('paymentGoal', i) as string;
+								body.buyer = { name: this.getNodeParameter('buyerName', i) as string };
+								break;
 							case 'eventSignUp':
 								body.firstName = this.getNodeParameter('firstName', i) as string;
 								body.lastName = this.getNodeParameter('lastName', i) as string;
@@ -381,9 +399,16 @@ export class InwendoErp implements INodeType {
 								break;
 						}
 
-						// Add additional fields
+						// Add additional fields; buyer* fields of invoices and offers belong to the nested buyer
 						const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
-						Object.assign(body, additionalFields);
+						for (const [key, value] of Object.entries(additionalFields)) {
+							const buyerField = BUYER_FIELDS[key];
+							if (buyerField && body.buyer) {
+								(body.buyer as IDataObject)[buyerField] = value;
+							} else {
+								body[key] = value;
+							}
+						}
 
 						responseData = await inwendoErpApiRequest.call(
 							this,
@@ -406,10 +431,10 @@ export class InwendoErp implements INodeType {
 							);
 						}
 
-						const method = PATCH_SUPPORTED.has(resource) ? 'PATCH' : 'PUT';
+						// PATCH only changes the given fields; PUT would clear all others.
 						responseData = await inwendoErpApiRequest.call(
 							this,
-							method,
+							'PATCH',
 							`${basePath}/${id}`,
 							{ [RESOURCE_BLOCK_PREFIXES[resource]]: updateFields },
 						);
@@ -421,12 +446,18 @@ export class InwendoErp implements INodeType {
 							resource === 'invoice' ? 'invoiceId' : 'offerId',
 							i,
 						) as string;
-						responseData = await inwendoErpApiRequest.call(
-							this,
-							'GET',
-							`${basePath}/${id}/pdf`,
+						const pdf = await inwendoErpApiRequestBinary.call(this, `${basePath}/${id}/pdf`);
+						const binaryData = await this.helpers.prepareBinaryData(
+							pdf.data,
+							`${resource}-${id}.pdf`,
+							pdf.contentType || 'application/pdf',
 						);
-						break;
+						returnData.push({
+							json: { id, resource },
+							binary: { data: binaryData },
+							pairedItem: { item: i },
+						});
+						continue;
 					}
 
 					default:

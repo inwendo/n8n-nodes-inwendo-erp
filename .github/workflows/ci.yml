@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      # The E2E tests run against a live ERP when IW_E2E_ERP_HOST / IW_E2E_ERP_TOKEN
+      # are configured as repository secrets; without them they are skipped.
+      - run: node --test "test/e2e/*.test.js"
+        env:
+          IW_E2E_ERP_HOST: ${{ secrets.IW_E2E_ERP_HOST }}
+          IW_E2E_ERP_TOKEN: ${{ secrets.IW_E2E_ERP_TOKEN }}

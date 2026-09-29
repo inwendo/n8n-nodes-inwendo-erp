@@ -6,7 +6,7 @@ import type {
 	IWebhookFunctions,
 	IWebhookResponseData,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { randomBytes } from 'crypto';
 
 import { inwendoErpApiRequest } from './GenericFunctions';
@@ -24,7 +24,7 @@ export class InwendoErpTrigger implements INodeType {
 			name: 'inwendo ERP Trigger',
 		},
 		inputs: [],
-		outputs: ['main'],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [
 			{
 				name: 'inwendoErpApi',
@@ -261,11 +261,9 @@ export class InwendoErpTrigger implements INodeType {
 			const incomingEntityClass = (body.iw_entity_class as string) || '';
 			const incomingShortClass = (body.iw_entity_short_class as string) || '';
 
-			// Check both full class name and short class name
-			if (
-				!incomingEntityClass.includes(entityType) &&
-				incomingShortClass !== entityType
-			) {
+			// Compare the class name without namespace ("TimeEntry" must not match "WorkTimeEntry")
+			const incomingClassName = incomingEntityClass.split('\\').pop() || '';
+			if (incomingClassName !== entityType && incomingShortClass !== entityType) {
 				return {
 					webhookResponse: 'Filtered',
 				};
