@@ -194,7 +194,7 @@ export const ticketFields: INodeProperties[] = [
 				name: 'crmProject',
 				type: 'string',
 				default: '',
-				description: 'ID of the associated CRM project',
+				description: 'ID of the associated CRM project. Required for creating a ticket when the API token has the CRM Project scope.',
 			},
 			{
 				displayName: 'Assigned User ID',

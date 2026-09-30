@@ -36,12 +36,6 @@ export const invoiceOperations: INodeProperties[] = [
 				description: 'Get the PDF of an invoice',
 				action: 'Get invoice PDF',
 			},
-			{
-				name: 'Update',
-				value: 'update',
-				description: 'Update an invoice (PATCH)',
-				action: 'Update an invoice',
-			},
 		],
 		default: 'getAll',
 	},
@@ -49,7 +43,7 @@ export const invoiceOperations: INodeProperties[] = [
 
 export const invoiceFields: INodeProperties[] = [
 	// ----------------------------------
-	//         invoice:get / update / getPdf
+	//         invoice:get / getPdf
 	// ----------------------------------
 	{
 		displayName: 'Invoice ID',
@@ -60,7 +54,7 @@ export const invoiceFields: INodeProperties[] = [
 		displayOptions: {
 			show: {
 				resource: ['invoice'],
-				operation: ['get', 'update', 'getPdf'],
+				operation: ['get', 'getPdf'],
 			},
 		},
 		description: 'The ID of the invoice',
@@ -117,6 +111,76 @@ export const invoiceFields: INodeProperties[] = [
 	//         invoice:create
 	// ----------------------------------
 	{
+		displayName: 'Accounting Type ID',
+		name: 'accountingType',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['invoice'],
+				operation: ['create'],
+			},
+		},
+		description: 'ID of the accounting type (determines booking account)',
+	},
+	{
+		displayName: 'Tax ID',
+		name: 'tax',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['invoice'],
+				operation: ['create'],
+			},
+		},
+		description: 'ID of the tax configuration (e.g. 19% VAT)',
+	},
+	{
+		displayName: 'Payment Type ID',
+		name: 'paymentType',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['invoice'],
+				operation: ['create'],
+			},
+		},
+		description: 'ID of the payment type (e.g. bank transfer, direct debit)',
+	},
+	{
+		displayName: 'Payment Goal ID',
+		name: 'paymentGoal',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['invoice'],
+				operation: ['create'],
+			},
+		},
+		description: 'ID of the payment goal (due date configuration)',
+	},
+	{
+		displayName: 'Buyer Name',
+		name: 'buyerName',
+		type: 'string',
+		required: true,
+		default: '',
+		displayOptions: {
+			show: {
+				resource: ['invoice'],
+				operation: ['create'],
+			},
+		},
+		description: 'Name of the buyer (company or person) printed on the invoice',
+	},
+	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
 		type: 'collection',
@@ -130,11 +194,60 @@ export const invoiceFields: INodeProperties[] = [
 		},
 		options: [
 			{
-				displayName: 'Name',
-				name: 'name',
+				displayName: 'Addon Data',
+				name: 'addonData',
 				type: 'string',
 				default: '',
-				description: 'Internal name / title for this invoice',
+				description: 'Additional custom data as JSON string',
+			},
+			{
+				displayName: 'Billing Payment Profile ID',
+				name: 'billingPaymentProfile',
+				type: 'string',
+				default: '',
+				description: 'ID of the billing payment profile (e.g. SEPA mandate)',
+			},
+			{
+				displayName: 'Booking ID',
+				name: 'baseBooking',
+				type: 'string',
+				default: '',
+				description: 'ID of the booking this invoice bills',
+			},
+			{
+				displayName: 'Buyer Reference ID',
+				name: 'buyerReferenceId',
+				type: 'string',
+				default: '',
+				description: 'Buyer reference (Leitweg-ID) for e-invoices',
+			},
+			{
+				displayName: 'Buyer Secondary Name',
+				name: 'buyerSecondaryName',
+				type: 'string',
+				default: '',
+				description: 'Second name line of the buyer',
+			},
+			{
+				displayName: 'Buyer Tax Number',
+				name: 'buyerTaxnumber',
+				type: 'string',
+				default: '',
+				description: 'Tax number of the buyer',
+			},
+			{
+				displayName: 'Buyer VAT ID',
+				name: 'buyerVatId',
+				type: 'string',
+				default: '',
+				description: 'VAT identification number of the buyer',
+			},
+			{
+				displayName: 'Event Sign-Up ID',
+				name: 'baseEventSignUp',
+				type: 'string',
+				default: '',
+				description: 'ID of the event sign-up this invoice bills',
 			},
 			{
 				displayName: 'Message',
@@ -142,34 +255,6 @@ export const invoiceFields: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Message / note printed on the invoice',
-			},
-			{
-				displayName: 'Accounting Type ID',
-				name: 'accountingType',
-				type: 'string',
-				default: '',
-				description: 'ID of the accounting type (determines booking account)',
-			},
-			{
-				displayName: 'Tax ID',
-				name: 'tax',
-				type: 'string',
-				default: '',
-				description: 'ID of the tax configuration (e.g. 19% VAT)',
-			},
-			{
-				displayName: 'Payment Type ID',
-				name: 'paymentType',
-				type: 'string',
-				default: '',
-				description: 'ID of the payment type (e.g. bank transfer, direct debit)',
-			},
-			{
-				displayName: 'Payment Goal ID',
-				name: 'paymentGoal',
-				type: 'string',
-				default: '',
-				description: 'ID of the payment goal (due date configuration)',
 			},
 			{
 				displayName: 'Offer ID',
@@ -177,165 +262,6 @@ export const invoiceFields: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'ID of the offer this invoice is based on',
-			},
-			{
-				displayName: 'Start Date',
-				name: 'startDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Service / billing period start date',
-			},
-			{
-				displayName: 'End Date',
-				name: 'endDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Service / billing period end date',
-			},
-			{
-				displayName: 'Payment Date',
-				name: 'paymentDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Date the invoice was paid',
-			},
-			{
-				displayName: 'Send via Email',
-				name: 'mitShouldSendEmail',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to send this invoice via email automatically',
-			},
-			{
-				displayName: 'Send via Post',
-				name: 'mitShouldSendPostal',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to send this invoice via postal mail automatically',
-			},
-			{
-				displayName: 'Archived',
-				name: 'archived',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to archive this invoice',
-			},
-			{
-				displayName: 'Addon Data',
-				name: 'addonData',
-				type: 'string',
-				default: '',
-				description: 'Additional custom data as JSON string',
-			},
-		],
-	},
-
-	// ----------------------------------
-	//         invoice:update
-	// ----------------------------------
-	{
-		displayName: 'Update Fields',
-		name: 'updateFields',
-		type: 'collection',
-		placeholder: 'Add Field',
-		default: {},
-		displayOptions: {
-			show: {
-				resource: ['invoice'],
-				operation: ['update'],
-			},
-		},
-		options: [
-			{
-				displayName: 'Name',
-				name: 'name',
-				type: 'string',
-				default: '',
-				description: 'Internal name / title for this invoice',
-			},
-			{
-				displayName: 'Message',
-				name: 'message',
-				type: 'string',
-				default: '',
-				description: 'Message / note printed on the invoice',
-			},
-			{
-				displayName: 'Accounting Type ID',
-				name: 'accountingType',
-				type: 'string',
-				default: '',
-				description: 'ID of the accounting type (determines booking account)',
-			},
-			{
-				displayName: 'Tax ID',
-				name: 'tax',
-				type: 'string',
-				default: '',
-				description: 'ID of the tax configuration (e.g. 19% VAT)',
-			},
-			{
-				displayName: 'Payment Type ID',
-				name: 'paymentType',
-				type: 'string',
-				default: '',
-				description: 'ID of the payment type (e.g. bank transfer, direct debit)',
-			},
-			{
-				displayName: 'Payment Goal ID',
-				name: 'paymentGoal',
-				type: 'string',
-				default: '',
-				description: 'ID of the payment goal (due date configuration)',
-			},
-			{
-				displayName: 'Start Date',
-				name: 'startDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Service / billing period start date',
-			},
-			{
-				displayName: 'End Date',
-				name: 'endDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Service / billing period end date',
-			},
-			{
-				displayName: 'Payment Date',
-				name: 'paymentDate',
-				type: 'dateTime',
-				default: '',
-				description: 'Date the invoice was paid',
-			},
-			{
-				displayName: 'Send via Email',
-				name: 'mitShouldSendEmail',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to send this invoice via email automatically',
-			},
-			{
-				displayName: 'Send via Post',
-				name: 'mitShouldSendPostal',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to send this invoice via postal mail automatically',
-			},
-			{
-				displayName: 'Archived',
-				name: 'archived',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to archive this invoice',
-			},
-			{
-				displayName: 'Addon Data',
-				name: 'addonData',
-				type: 'string',
-				default: '',
-				description: 'Additional custom data as JSON string',
 			},
 		],
 	},
