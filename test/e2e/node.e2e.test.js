@@ -9,7 +9,8 @@
  * own_ticket, time, billing, event, event_booking, media, webhook) and
  * "Allow admin functions" for the Webhook resource. Invoices and offers need
  * the default billing entities (tax, accounting types, payment type / goal).
- * Set IW_E2E_PDF=1 when the ERP can render PDFs (LaTeX service).
+ * Set IW_E2E_PDF=1 when the ERP can render PDFs (LaTeX service), IW_E2E_SMART_LOCK_ID to the id of
+ * a smart lock for the access check (Scope event).
  * Without IW_E2E_ERP_HOST / IW_E2E_ERP_TOKEN every test is skipped.
  */
 const { describe, it, before } = require('node:test');
@@ -248,6 +249,28 @@ describe('inwendo ERP node against a live ERP', { skip }, () => {
 			queryParameters: { parameter: [{ name: 'searchString', value: run }] },
 		});
 		assert.ok(items.length >= 1);
+	});
+
+	it('smart lock: check access of a reader and the smart lock log', async (t) => {
+		// listing smart locks needs a super admin token, so the lock comes from the environment
+		const smartLockId = process.env.IW_E2E_SMART_LOCK_ID;
+		if (!smartLockId) {
+			t.skip('IW_E2E_SMART_LOCK_ID not set');
+			return;
+		}
+		const answer = single(await runNode({ resource: 'smartLock', operation: 'checkAccess', smartLockId, credential: `${run}-unknown\n`, credentialType: 'auto', open: false }));
+		assert.equal(answer.granted, false);
+		assert.equal(answer.reason, 'unknown_credential');
+		assert.equal(answer.credential, `${run}-unknown`);
+
+		// the smart lock log is for super admins only (token with "allow super admin functions")
+		try {
+			const log = await runNode({ resource: 'smartLock', operation: 'getLog', logSmartLockId: smartLockId, returnAll: false, limit: 5 });
+			assert.ok(log.some((item) => item.json.action === 'access_denied' && item.json.source === 'n8n'));
+		} catch (error) {
+			if (!/inwendo ERP error 403/.test(error.message)) throw error;
+			t.diagnostic('smart lock log skipped: the token has no super admin functions');
+		}
 	});
 
 	it('an ERP error surfaces as a node error', async () => {

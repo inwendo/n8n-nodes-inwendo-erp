@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-inwendo-erp",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"description": "n8n community node for inwendo ERP integration",
 	"keywords": [
 		"n8n-community-node-package"
@@ -37,7 +37,8 @@
 		],
 		"nodes": [
 			"dist/nodes/InwendoErp/InwendoErp.node.js",
-			"dist/nodes/InwendoErp/InwendoErpTrigger.node.js"
+			"dist/nodes/InwendoErp/InwendoErpTrigger.node.js",
+			"dist/nodes/InwendoErp/InwendoErpLockTrigger.node.js"
 		]
 	},
 	"devDependencies": {
