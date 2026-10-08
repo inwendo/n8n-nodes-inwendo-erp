@@ -25,6 +25,10 @@ import { eventOperations, eventFields } from './descriptions/EventDescription';
 import { eventSignUpOperations, eventSignUpFields } from './descriptions/EventSignUpDescription';
 import { newsArticleOperations, newsArticleFields } from './descriptions/NewsArticleDescription';
 import { webhookOperations, webhookFields } from './descriptions/WebhookDescription';
+import { smartLockOperations, smartLockFields } from './descriptions/SmartLockDescription';
+
+/** Smart lock operations that are no plain CRUD request. */
+const SMART_LOCK_ACTIONS = ['unlock', 'lock', 'status', 'checkAccess', 'getLog'];
 
 /**
  * Map of resource names to their API endpoint paths.
@@ -42,6 +46,7 @@ const RESOURCE_ENDPOINTS: Record<string, string> = {
 	eventSignUp: '/api/event/base_event_signup',
 	newsArticle: '/api/media/news_article',
 	webhook: '/api/dw/webhook',
+	smartLock: '/api/event/smart_lock',
 };
 
 /**
@@ -62,6 +67,7 @@ const RESOURCE_BLOCK_PREFIXES: Record<string, string> = {
 	eventSignUp: 'data',
 	newsArticle: 'data',
 	webhook: 'data',
+	smartLock: 'data',
 };
 
 /**
@@ -90,6 +96,7 @@ const RESOURCE_ID_FIELDS: Record<string, string> = {
 	eventSignUp: 'eventSignUpId',
 	newsArticle: 'newsArticleId',
 	webhook: 'webhookId',
+	smartLock: 'smartLockId',
 };
 
 export class InwendoErp implements INodeType {
@@ -130,6 +137,7 @@ export class InwendoErp implements INodeType {
 					{ name: 'Offer', value: 'offer' },
 					{ name: 'Person', value: 'person' },
 					{ name: 'Project', value: 'project' },
+					{ name: 'Smart Lock', value: 'smartLock' },
 					{ name: 'Ticket', value: 'ticket' },
 					{ name: 'Time Entry', value: 'timeEntry' },
 					{ name: 'Webhook', value: 'webhook' },
@@ -244,6 +252,8 @@ export class InwendoErp implements INodeType {
 			...newsArticleFields,
 			...webhookOperations,
 			...webhookFields,
+			...smartLockOperations,
+			...smartLockFields,
 		],
 	};
 
@@ -293,6 +303,14 @@ export class InwendoErp implements INodeType {
 
 				// Handle standard resources
 				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (resource === 'smartLock' && SMART_LOCK_ACTIONS.includes(operation)) {
+					const result = await executeSmartLockAction.call(this, operation, i);
+					for (const item of Array.isArray(result) ? result : [result]) {
+						returnData.push({ json: item, pairedItem: { item: i } });
+					}
+					continue;
+				}
 				const basePath = RESOURCE_ENDPOINTS[resource];
 				const idField = RESOURCE_ID_FIELDS[resource];
 
@@ -488,5 +506,55 @@ export class InwendoErp implements INodeType {
 		}
 
 		return [returnData];
+	}
+}
+
+/**
+ * Smart lock actions: open / lock / state through the lock's provider (with the rights of the
+ * token's user, written to the smart lock log), the smart lock log and the access check of a reader
+ * (/api/n8n/smart_lock/check_access, same rules as the app).
+ */
+async function executeSmartLockAction(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+	if (operation === 'getLog') {
+		const qs: IDataObject = {};
+		const smartLockId = String(this.getNodeParameter('logSmartLockId', i, '') || '').trim();
+		if (smartLockId) {
+			qs.smartLock = smartLockId;
+		}
+		if (this.getNodeParameter('returnAll', i) as boolean) {
+			return await inwendoErpApiRequestAllItems.call(this, 'GET', '/api/event/smart_lock_log', qs);
+		}
+		const limit = this.getNodeParameter('limit', i) as number;
+		const items = await inwendoErpApiRequest.call(this, 'GET', '/api/event/smart_lock_log', undefined, {
+			...qs,
+			page: '0',
+			pageSize: String(limit),
+		});
+		return Array.isArray(items) ? items.slice(0, limit) : items;
+	}
+
+	const smartLockId = String(this.getNodeParameter('smartLockId', i) || '').trim();
+	if (!smartLockId) {
+		throw new NodeOperationError(this.getNode(), 'Smart Lock ID is required', { itemIndex: i });
+	}
+	switch (operation) {
+		case 'unlock':
+		case 'lock':
+			return await inwendoErpApiRequest.call(this, 'POST', `/api/event/smart_lock/${smartLockId}/${operation}`, {});
+		case 'status':
+			return await inwendoErpApiRequest.call(this, 'GET', `/api/event/smart_lock/${smartLockId}/status`);
+		default: {
+			const credential = String(this.getNodeParameter('credential', i) ?? '').replace(/[\r\n\t\0]+/g, '').trim();
+			if (!credential) {
+				throw new NodeOperationError(this.getNode(), 'Credential is required', { itemIndex: i });
+			}
+			const answer = await inwendoErpApiRequest.call(this, 'POST', '/api/n8n/smart_lock/check_access', {
+				smart_lock_id: Number(smartLockId),
+				credential,
+				credential_type: this.getNodeParameter('credentialType', i, 'auto') as string,
+				open: this.getNodeParameter('open', i, false) as boolean,
+			});
+			return { ...answer, credential };
+		}
 	}
 }

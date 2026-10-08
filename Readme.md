@@ -24,6 +24,7 @@ Perform CRUD operations on the following ERP resources:
 | Event Sign-Up | Get, Get Many, Create, Update (PATCH) |
 | News Article | Get, Get Many, Create, Update (PATCH) |
 | Webhook | Get, Get Many, Create, Update (PATCH) |
+| Smart Lock | Check Access, Unlock, Lock, Status, Get, Get Many, Get Log |
 | Generic API Request | Custom HTTP request to any ERP endpoint |
 
 Updates always use `PATCH`, so fields you do not set keep their value.
@@ -33,6 +34,51 @@ invoices a payment type) plus the buyer name. **Get PDF** returns the PDF as
 binary data (`data` property).
 
 The action node can also be used as a tool by AI agents (`usableAsTool`).
+
+**Smart Lock → Check Access** asks the ERP whether a credential a reader read
+(barcode, QR or RFID passed on by the workflow) may open a smart lock:
+the QR code the app shows for the lock, the QR code of the digital member card
+or the RFID / chip card number stored at the person. The ERP checks with the
+rules of the app (super admin, self service rights, bookable, employment
+contract, booking ±1 h) and writes the smart lock log (source `n8n`). The plain
+member number is not accepted, it can be guessed. Answer:
+
+```json
+{ "granted": true, "reason": "granted", "credential_type": "card",
+  "smart_lock": { "id": 12, "name": "Haupteingang" },
+  "person": { "id": 345, "name": "Erika Mustermann" }, "opened": null }
+```
+
+`reason` for a denial: `unknown_credential`, `no_access`, `invalid_code`,
+`code_expired`. With **Open When Granted** the ERP opens a lock of another
+provider (Nuki, LOQED, Home Assistant) itself. **Unlock / Lock / Status** act
+with the rights of the token's user (like the app); **Get, Get Many, Get Log**
+need a token with super admin functions.
+
+### inwendo ERP Lock Trigger
+
+Locks of an n8n workflow become ERP smart locks, so the ERP can open them:
+
+1. Add the trigger, list the locks (Lock ID, name in the ERP, *In the app*:
+   open button or QR code) and activate the workflow. The trigger registers its
+   locks with its **production webhook URL** at `/api/n8n/smart_lock/register`
+   (instance id and secret are generated once and kept in the workflow).
+2. In the ERP open the smart lock connection (provider n8n) and run **Sync
+   devices**; grant access to the smart locks as usual.
+3. When a user with access taps *open* in the app (or through the API / Home
+   Assistant), the ERP posts a signed command; the workflow gets
+   `command` (`open` / `lock`), `lock_id`, `lock_name`, `smart_lock_id` and
+   switches the relay, Shelly, … .
+
+Commands are signed with HMAC-SHA256 of the instance secret
+(`X-IW-Signature`), carry a timestamp and a nonce and are rejected when they
+are older than 60 seconds (plus 30 seconds clock difference) or replayed.
+*Result*: report success when the command arrives, or answer with the last
+node (first item with `success: true / false`, optionally `state`). n8n must be
+reachable via **https** (the ERP rejects private addresses); test webhook URLs
+are not registered. Deactivating the workflow removes the locks from the ERP
+(the smart locks stay and come back with the next activation). In queue mode
+with several webhook processes the replay protection is per process.
 
 ### inwendo ERP Trigger
 
@@ -78,6 +124,8 @@ is unrelated to webhook auto-registration:
 | Booking, Event, Event Sign-Up | Event, Event Booking |
 | News Article | Media |
 | Webhook (action node) | Webhook and **Allow admin functions** |
+| Smart Lock: Check Access, Lock Trigger | Event (Write) |
+| Smart Lock: Get, Get Many, Get Log | Event and **Allow super admin functions** |
 
 When the ERP rejects a request, the node error shows the ERP's error code and
 message (`X-IW-ERROR-CODE` / `X-IW-ERROR-JSON`).
@@ -198,7 +246,9 @@ IW_E2E_ERP_HOST=https://erp.example.com IW_E2E_ERP_TOKEN=<jwt> npm run test:e2e
 ```
 
 The token needs the scopes listed above plus "Allow admin functions". Set
-`IW_E2E_PDF=1` if the instance can render PDFs.
+`IW_E2E_PDF=1` if the instance can render PDFs and `IW_E2E_SMART_LOCK_ID` to a
+smart lock for the access check. `npm test` runs offline tests, among them the
+lock trigger's registration and signature checks.
 
 ## API Endpoints
 
@@ -216,6 +266,8 @@ The token needs the scopes listed above plus "Allow admin functions". Set
 | Event Sign-Up | `/api/event/base_event_signup` |
 | News Article | `/api/media/news_article` |
 | Webhook | `/api/dw/webhook` |
+| Smart Lock | `/api/event/smart_lock`, `/api/event/smart_lock_log`, `/api/n8n/smart_lock/check_access` |
+| Lock Trigger | `/api/n8n/smart_lock/register` (POST / DELETE) |
 
 ## License
 
