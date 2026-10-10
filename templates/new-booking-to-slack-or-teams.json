@@ -1,0 +1,107 @@
+{
+  "name": "inwendo ERP: new booking to Slack / Teams",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## New booking to Slack / Teams\nThe trigger registers a webhook for created bookings when the workflow is activated (token scope Webhook write).\n\nSet the Slack channel, or enable the Teams node and pick team and channel.",
+        "height": 220,
+        "width": 560
+      },
+      "id": "38925d99-6684-55f4-902c-c310f6df2103",
+      "name": "About this template",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "autoRegister": true,
+        "entityType": "BaseBooking",
+        "action": "create"
+      },
+      "id": "45bcec15-3b18-58b2-9c60-9cd85e9976e6",
+      "name": "New Booking",
+      "type": "n8n-nodes-inwendo-erp.inwendoErpTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#bookings",
+          "mode": "name"
+        },
+        "text": "=New booking: {{ $json.data.title || $json.data.name || (\"#\" + $json.iw_entity_id) }}\\n{{ $json.data.start }} – {{ $json.data.end }}",
+        "otherOptions": {}
+      },
+      "id": "c5efd637-61d4-5f6b-b073-c4180c6d7342",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "channelMessage",
+        "teamId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "channelId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "contentType": "text",
+        "message": "=New booking: {{ $json.data.title || $json.data.name || (\"#\" + $json.iw_entity_id) }}\\n{{ $json.data.start }} – {{ $json.data.end }}",
+        "options": {}
+      },
+      "id": "dbd09f5f-64bc-5286-8d86-93d5953559ab",
+      "name": "Microsoft Teams",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ],
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "New Booking": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Microsoft Teams",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

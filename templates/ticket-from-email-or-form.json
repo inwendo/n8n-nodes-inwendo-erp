@@ -1,0 +1,194 @@
+{
+  "name": "inwendo ERP: ticket from incoming e-mail or form",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Ticket from e-mail or form\nEvery e-mail of the IMAP mailbox and every form submission becomes an ERP ticket.\n\nSet the IMAP credential, the inwendo ERP credential (scope Ticket; with the CRM Project scope add a Project ID) and activate.",
+        "height": 220,
+        "width": 560
+      },
+      "id": "38925d99-6684-55f4-902c-c310f6df2103",
+      "name": "About this template",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "798f7c28-62b2-5662-a60a-82c1a73a3e04",
+      "name": "Incoming E-Mail",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Report a problem",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Subject",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Description",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "E-Mail",
+              "fieldType": "email"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "db55722f-81da-5aef-a521-857b8873b522",
+      "name": "Contact Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d5da8511-f71b-594b-8732-2eb3a188852e",
+              "name": "headline",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "95f358cc-2959-5285-b920-3770724fdd75",
+              "name": "description",
+              "value": "={{ ($json.from ? \"From: \" + $json.from + \"\\n\\n\" : \"\") + ($json.textPlain || $json.text || \"\") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c7ab8c37-fe57-53e3-a4bf-e2959aa5d976",
+      "name": "Ticket From E-Mail",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a518452-7e1b-5d62-9d51-ed8f4d7938fb",
+              "name": "headline",
+              "value": "={{ $json.Subject }}",
+              "type": "string"
+            },
+            {
+              "id": "631ac542-d341-5616-945b-92bda0477f07",
+              "name": "description",
+              "value": "={{ ($json[\"E-Mail\"] ? \"From: \" + $json[\"E-Mail\"] + \"\\n\\n\" : \"\") + $json.Description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2f5d10e4-91c2-5191-9604-2d49a62d1ce3",
+      "name": "Ticket From Form",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "headline": "={{ $json.headline }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}",
+          "priority": 3
+        }
+      },
+      "id": "68be79b2-515b-5eed-8b24-57b623698355",
+      "name": "Create Ticket",
+      "type": "n8n-nodes-inwendo-erp.inwendoErp",
+      "typeVersion": 1,
+      "position": [
+        460,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Incoming E-Mail": {
+      "main": [
+        [
+          {
+            "node": "Ticket From E-Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact Form": {
+      "main": [
+        [
+          {
+            "node": "Ticket From Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket From E-Mail": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket From Form": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

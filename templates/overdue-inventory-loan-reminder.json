@@ -1,0 +1,159 @@
+{
+  "name": "inwendo ERP: reminder for overdue inventory loans",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Overdue inventory loans\nEvery morning: all lent loans past their due date, a push notification and e-mail to each borrower.\n\nNeeds the ERP setting event_inventory_enabled and a token with scopes Event Booking (read) and Notification (write) + CRM (read).",
+        "height": 220,
+        "width": 560
+      },
+      "id": "38925d99-6684-55f4-902c-c310f6df2103",
+      "name": "About this template",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "68d4af2d-c220-5ef2-be93-93cb4d3ba18c",
+      "name": "Every Morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "inventoryLoan",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "state": "OVERDUE"
+        }
+      },
+      "id": "842941c4-cffd-517f-a2af-490d15d04e30",
+      "name": "Overdue Loans",
+      "type": "n8n-nodes-inwendo-erp.inwendoErp",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b1",
+              "leftValue": "={{ $json.person_minimal?.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "010d990f-b1ee-52f1-be9d-2aa8d54c7b4b",
+      "name": "Has Borrower",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "notification",
+        "operation": "send",
+        "recipientType": "person",
+        "recipientIds": "={{ $json.person_minimal.id }}",
+        "text": "=Please return: {{ $json.bookable_name }}",
+        "longText": "=The loan of {{ $json.quantity }} × {{ $json.bookable_name }} was due on {{ DateTime.fromISO($json.due_at).toFormat(\"dd.MM.yyyy HH:mm\") }}. Please bring it back.",
+        "channels": [
+          "sendPush",
+          "sendMail"
+        ],
+        "additionalFields": {
+          "checkForDuplicates": false
+        }
+      },
+      "id": "f6d38136-3513-5d7e-be8c-845cb9713e90",
+      "name": "Remind Borrower",
+      "type": "n8n-nodes-inwendo-erp.inwendoErp",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every Morning": {
+      "main": [
+        [
+          {
+            "node": "Overdue Loans",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Overdue Loans": {
+      "main": [
+        [
+          {
+            "node": "Has Borrower",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Borrower": {
+      "main": [
+        [
+          {
+            "node": "Remind Borrower",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
