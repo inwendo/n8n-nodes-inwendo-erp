@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-inwendo-erp",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "n8n community node for inwendo ERP integration",
 	"keywords": [
 		"n8n-community-node-package"
@@ -28,7 +28,8 @@
 		"test": "npm run build && node --test \"test/unit/*.test.js\""
 	},
 	"files": [
-		"dist"
+		"dist",
+		"templates"
 	],
 	"n8n": {
 		"n8nNodesApiVersion": 1,
