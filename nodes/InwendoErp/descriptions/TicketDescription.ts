@@ -103,6 +103,27 @@ export const ticketFields: INodeProperties[] = [
 		},
 		description: 'Search string to filter tickets',
 	},
+	{
+		displayName: 'SLA Status',
+		name: 'slaStatus',
+		type: 'multiOptions',
+		options: [
+			{ name: 'Breached', value: 'breached' },
+			{ name: 'Met', value: 'met' },
+			{ name: 'Missed', value: 'missed' },
+			{ name: 'Open', value: 'open' },
+			{ name: 'Warning', value: 'warning' },
+		],
+		default: [],
+		displayOptions: {
+			show: {
+				resource: ['ticket'],
+				operation: ['getAll'],
+			},
+		},
+		description:
+			'Only tickets whose first response or resolution has one of these service-level states (ERP setting customer_panel_ticket_sla_enabled). Applied to the fetched tickets.',
+	},
 
 	// ----------------------------------
 	//         ticket:create

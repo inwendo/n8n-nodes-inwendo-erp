@@ -26,6 +26,25 @@ import { eventSignUpOperations, eventSignUpFields } from './descriptions/EventSi
 import { newsArticleOperations, newsArticleFields } from './descriptions/NewsArticleDescription';
 import { webhookOperations, webhookFields } from './descriptions/WebhookDescription';
 import { smartLockOperations, smartLockFields } from './descriptions/SmartLockDescription';
+import { inventoryLoanOperations, inventoryLoanFields } from './descriptions/InventoryLoanDescription';
+import { shiftPlanEntryOperations, shiftPlanEntryFields } from './descriptions/ShiftPlanEntryDescription';
+import {
+	volunteerHourEntryOperations,
+	volunteerHourEntryFields,
+	helperShiftOperations,
+	helperShiftFields,
+} from './descriptions/VolunteerDescription';
+import { membershipPauseOperations, membershipPauseFields } from './descriptions/MembershipPauseDescription';
+import { generalMeetingOperations, generalMeetingFields } from './descriptions/GeneralMeetingDescription';
+import { occupancyOperations, occupancyFields } from './descriptions/OccupancyDescription';
+import { usageCounterOperations, usageCounterFields } from './descriptions/UsageCounterDescription';
+import { notificationOperations, notificationFields } from './descriptions/NotificationDescription';
+import {
+	ACTION_RESOURCES,
+	executeResourceAction,
+	filterTicketsBySla,
+	flattenTicketSla,
+} from './ResourceActions';
 
 /** Smart lock operations that are no plain CRUD request. */
 const SMART_LOCK_ACTIONS = ['unlock', 'lock', 'status', 'checkAccess', 'getLog'];
@@ -131,15 +150,24 @@ export class InwendoErp implements INodeType {
 					{ name: 'Company', value: 'company' },
 					{ name: 'Event', value: 'event' },
 					{ name: 'Event Sign-Up', value: 'eventSignUp' },
+					{ name: 'General Meeting', value: 'generalMeeting' },
 					{ name: 'Generic API Request', value: 'genericRequest' },
+					{ name: 'Helper Shift', value: 'helperShift' },
+					{ name: 'Inventory Loan', value: 'inventoryLoan' },
 					{ name: 'Invoice', value: 'invoice' },
+					{ name: 'Membership Pause', value: 'membershipPause' },
 					{ name: 'News Article', value: 'newsArticle' },
+					{ name: 'Notification', value: 'notification' },
+					{ name: 'Occupancy', value: 'occupancy' },
 					{ name: 'Offer', value: 'offer' },
 					{ name: 'Person', value: 'person' },
 					{ name: 'Project', value: 'project' },
+					{ name: 'Shift Plan Entry', value: 'shiftPlanEntry' },
 					{ name: 'Smart Lock', value: 'smartLock' },
 					{ name: 'Ticket', value: 'ticket' },
 					{ name: 'Time Entry', value: 'timeEntry' },
+					{ name: 'Usage Counter', value: 'usageCounter' },
+					{ name: 'Volunteer Hour Entry', value: 'volunteerHourEntry' },
 					{ name: 'Webhook', value: 'webhook' },
 				],
 				default: 'company',
@@ -254,6 +282,24 @@ export class InwendoErp implements INodeType {
 			...webhookFields,
 			...smartLockOperations,
 			...smartLockFields,
+			...inventoryLoanOperations,
+			...inventoryLoanFields,
+			...shiftPlanEntryOperations,
+			...shiftPlanEntryFields,
+			...volunteerHourEntryOperations,
+			...volunteerHourEntryFields,
+			...helperShiftOperations,
+			...helperShiftFields,
+			...membershipPauseOperations,
+			...membershipPauseFields,
+			...generalMeetingOperations,
+			...generalMeetingFields,
+			...occupancyOperations,
+			...occupancyFields,
+			...usageCounterOperations,
+			...usageCounterFields,
+			...notificationOperations,
+			...notificationFields,
 		],
 	};
 
@@ -308,6 +354,16 @@ export class InwendoErp implements INodeType {
 					const result = await executeSmartLockAction.call(this, operation, i);
 					for (const item of Array.isArray(result) ? result : [result]) {
 						returnData.push({ json: item, pairedItem: { item: i } });
+					}
+					continue;
+				}
+				if (ACTION_RESOURCES.includes(resource)) {
+					const result = await executeResourceAction.call(this, resource, operation, i);
+					for (const item of Array.isArray(result) ? result : [result]) {
+						returnData.push({
+							json: typeof item === 'object' && item !== null ? item : { data: item },
+							pairedItem: { item: i },
+						});
 					}
 					continue;
 				}
@@ -484,6 +540,16 @@ export class InwendoErp implements INodeType {
 							`Unknown operation: ${operation}`,
 							{ itemIndex: i },
 						);
+				}
+
+				// Tickets: service-level state at the top level, optional filter by it
+				if (resource === 'ticket' && (operation === 'get' || operation === 'getAll')) {
+					if (Array.isArray(responseData)) {
+						const slaStatus = this.getNodeParameter('slaStatus', i, []) as string[];
+						responseData = filterTicketsBySla(responseData, slaStatus).map(flattenTicketSla);
+					} else if (responseData && typeof responseData === 'object') {
+						responseData = flattenTicketSla(responseData);
+					}
 				}
 
 				// Normalize response to array

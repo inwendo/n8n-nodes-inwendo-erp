@@ -77,3 +77,42 @@ describe('inwendoErpApiRequest', () => {
 		assert.equal(ctx.requests[0].json, true);
 	});
 });
+
+describe('feature switched off in the ERP', () => {
+	const { featureDisabledSetting } = require(path.resolve(__dirname, '../../dist/nodes/InwendoErp/GenericFunctions.js'));
+
+	it('names the setting of a "feature disabled" answer (HTTP 400, X-IW-ERROR-CODE 404)', async () => {
+		const error = Object.assign(new Error('Request failed with status code 400'), {
+			response: {
+				status: 400,
+				headers: { 'x-iw-error-code': '404', 'x-iw-error-json': '["feature disabled: integration_occupancy_api_enabled"]' },
+			},
+		});
+		const ctx = context({ fail: error });
+		await assert.rejects(inwendoErpApiRequest.call(ctx, 'GET', '/api/event/bookable_occupancy'), (err) => {
+			assert.equal(err.message, 'inwendo ERP: this function is switched off (ERP setting "integration_occupancy_api_enabled")');
+			assert.match(err.description, /Enable the setting "integration_occupancy_api_enabled"/);
+			return true;
+		});
+	});
+
+	it('maps the older switched-off answers to their settings', () => {
+		assert.equal(featureDisabledSetting('1585', '{"message":"Inventory loans are switched off"}'), 'event_inventory_enabled');
+		assert.equal(featureDisabledSetting('1640', '{"message":"General meetings are disabled"}'), 'inwendo_crm_general_meeting_enabled');
+		assert.equal(featureDisabledSetting('6090', '["Volunteer hours are disabled"]'), 'volunteer_hours_enabled');
+		assert.equal(featureDisabledSetting('403', '["Shift planning is not enabled"]'), 'shift_planning_enabled');
+		assert.equal(featureDisabledSetting('403', '["Shift clocking is not enabled"]'), 'shift_clocking_enabled');
+		assert.equal(featureDisabledSetting('403', '["Access denied"]'), undefined);
+		assert.equal(featureDisabledSetting('1300', '["Invalid Form"]'), undefined);
+	});
+
+	it('leaves other ERP errors as they are', async () => {
+		const error = Object.assign(new Error('Request failed with status code 404'), {
+			response: { status: 404, headers: { 'x-iw-error-code': '404', 'x-iw-error-json': '{"message":"Loan not found"}' } },
+		});
+		await assert.rejects(inwendoErpApiRequest.call(context({ fail: error }), 'GET', '/api/x'), (err) => {
+			assert.equal(err.message, 'inwendo ERP error 404');
+			return true;
+		});
+	});
+});
