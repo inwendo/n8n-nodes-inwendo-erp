@@ -1,120 +1,108 @@
 # n8n-nodes-inwendo-erp
 
-This is an [n8n](https://n8n.io/) community node package for integrating with the [inwendo ERP](https://www.inwendo.de/) system.
+An [n8n](https://n8n.io/) community node package for the [inwendo ERP](https://www.inwendo.de/) / vynst.
+Read, create and update ERP data from n8n workflows, start workflows on ERP events (entity changes,
+timed booking events, door openings, check-ins) and offer locks of a workflow to the ERP.
 
-It provides nodes to read, create, and update ERP data from n8n workflows, and a trigger node to receive webhook events from the ERP.
+## Features
 
-## Nodes
+- **inwendo ERP** action node with 23 resources: CRM, tickets (with SLA state), time, billing,
+  bookings and events, inventory loans, shift plan, volunteer hours and helper shifts, membership
+  pauses, general meetings, occupancy, usage counters, notifications (push to the vynst app,
+  e-mail, SMS, …), smart locks, webhooks and a generic API request. Usable as a tool by AI agents.
+- **inwendo ERP Trigger**: starts a workflow when an entity is created, updated or deleted, and on
+  **timed booking events** (lead time before a booking, start, end, lag time after it). The ERP
+  webhook is registered and removed automatically.
+- **inwendo ERP Lock Trigger**: locks of a workflow (relay, Shelly, …) become ERP smart locks that
+  members open with the ERP's access rules.
+- [Workflow templates](#workflow-templates) to import: ticket from e-mail or form, new booking to
+  Slack / Teams, overdue inventory loans, access outside a booking, monthly usage counter report,
+  reminder before a booking.
+- Functions that are switched off in the ERP fail with a message that names the ERP setting to
+  enable.
 
-### inwendo ERP (Action Node)
+## Contents
 
-Perform CRUD operations on the following ERP resources:
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Credentials](#credentials)
+- [API token scopes](#api-token-scopes)
+- [ERP settings (feature switches)](#erp-settings-feature-switches)
+- [inwendo ERP (action node)](#inwendo-erp-action-node)
+- [inwendo ERP Trigger](#inwendo-erp-trigger)
+- [inwendo ERP Lock Trigger](#inwendo-erp-lock-trigger)
+- [Workflow templates](#workflow-templates)
+- [Development and tests](#development-and-tests)
+- [API endpoints](#api-endpoints)
 
-| Resource | Operations |
-|----------|-----------|
-| Company | Get, Get Many, Create, Update (PATCH) |
-| Person | Get, Get Many, Create, Update (PATCH) |
-| Invoice | Get, Get Many, Create, Get PDF (binary) |
-| Offer | Get, Get Many, Create, Get PDF (binary) |
-| Ticket | Get, Get Many, Create, Update (PATCH) |
-| Project | Get, Get Many, Create, Update (PATCH) |
-| Time Entry | Get, Get Many, Create, Update (PATCH) |
-| Booking | Get, Get Many, Create, Update (PATCH) |
-| Event | Get, Get Many, Create, Update (PATCH) |
-| Event Sign-Up | Get, Get Many, Create, Update (PATCH) |
-| News Article | Get, Get Many, Create, Update (PATCH) |
-| Webhook | Get, Get Many, Create, Update (PATCH) |
-| Smart Lock | Check Access, Unlock, Lock, Status, Get, Get Many, Get Log |
-| Generic API Request | Custom HTTP request to any ERP endpoint |
+## Requirements
 
-Updates always use `PATCH`, so fields you do not set keep their value.
-Invoices and offers cannot be changed through the API once created; creating
-one needs the IDs of an accounting type, a tax, a payment goal (and for
-invoices a payment type) plus the buyer name. **Get PDF** returns the PDF as
-binary data (`data` property).
+- n8n 1.85 or newer (for `NodeConnectionTypes`), including n8n 2.x; built against n8n-workflow 2.x
+- An inwendo ERP with the `/api/n8n/*` endpoints (`N8nWebhookController`) for the trigger's
+  auto-registration and the lock trigger. Older ERPs work with a manually created webhook
+  ([Manual setup](#manual-setup-advanced)).
+- Timed booking events and the occupancy need an ERP that ships them (see
+  [ERP settings](#erp-settings-feature-switches)).
 
-The action node can also be used as a tool by AI agents (`usableAsTool`).
+The package uses the `httpRequestWithAuthentication` helper (the `request`-based helpers are
+deprecated and rejected by the community node linter) and is published with npm provenance, which
+n8n requires for verified community nodes.
 
-**Smart Lock → Check Access** asks the ERP whether a credential a reader read
-(barcode, QR or RFID passed on by the workflow) may open a smart lock:
-the QR code the app shows for the lock, the QR code of the digital member card
-or the RFID / chip card number stored at the person. The ERP checks with the
-rules of the app (super admin, self service rights, bookable, employment
-contract, booking ±1 h) and writes the smart lock log (source `n8n`). The plain
-member number is not accepted, it can be guessed. Answer:
+## Installation
 
-```json
-{ "granted": true, "reason": "granted", "credential_type": "card",
-  "smart_lock": { "id": 12, "name": "Haupteingang" },
-  "person": { "id": 345, "name": "Erika Mustermann" }, "opened": null }
+### In n8n (community node)
+
+1. Go to **Settings → Community Nodes**
+2. Select **Install**
+3. Enter `n8n-nodes-inwendo-erp`
+4. Agree to the risks and click **Install**
+
+The nodes appear as *inwendo ERP*, *inwendo ERP Trigger* and *inwendo ERP Lock Trigger*.
+
+### Self-hosted without the UI
+
+```bash
+cd ~/.n8n/nodes
+npm install n8n-nodes-inwendo-erp
+# restart n8n
 ```
 
-`reason` for a denial: `unknown_credential`, `no_access`, `invalid_code`,
-`code_expired`. With **Open When Granted** the ERP opens a lock of another
-provider (Nuki, LOQED, Home Assistant) itself. **Unlock / Lock / Status** act
-with the rights of the token's user (like the app); **Get, Get Many, Get Log**
-need a token with super admin functions.
+### Local development
 
-### inwendo ERP Lock Trigger
-
-Locks of an n8n workflow become ERP smart locks, so the ERP can open them:
-
-1. Add the trigger, list the locks (Lock ID, name in the ERP, *In the app*:
-   open button or QR code) and activate the workflow. The trigger registers its
-   locks with its **production webhook URL** at `/api/n8n/smart_lock/register`
-   (instance id and secret are generated once and kept in the workflow).
-2. In the ERP open the smart lock connection (provider n8n) and run **Sync
-   devices**; grant access to the smart locks as usual.
-3. When a user with access taps *open* in the app (or through the API / Home
-   Assistant), the ERP posts a signed command; the workflow gets
-   `command` (`open` / `lock`), `lock_id`, `lock_name`, `smart_lock_id` and
-   switches the relay, Shelly, … .
-
-Commands are signed with HMAC-SHA256 of the instance secret
-(`X-IW-Signature`), carry a timestamp and a nonce and are rejected when they
-are older than 60 seconds (plus 30 seconds clock difference) or replayed.
-*Result*: report success when the command arrives, or answer with the last
-node (first item with `success: true / false`, optionally `state`). n8n must be
-reachable via **https** (the ERP rejects private addresses); test webhook URLs
-are not registered. Deactivating the workflow removes the locks from the ERP
-(the smart locks stay and come back with the next activation). In queue mode
-with several webhook processes the replay protection is per process.
-
-### inwendo ERP Trigger
-
-Receives webhook events from the ERP when entities are created, updated, or deleted. Supports filtering by entity type and action, and automatically registers/removes the matching webhook in the ERP when the workflow is activated/deactivated.
+```bash
+git clone https://github.com/inwendo/n8n-nodes-inwendo-erp.git
+cd n8n-nodes-inwendo-erp
+npm ci
+npm run build
+npm link
+cd /path/to/n8n
+npm link n8n-nodes-inwendo-erp
+```
 
 ## Credentials
 
-You need an inwendo ERP API token (JWT) to authenticate. Configure:
+Create an **inwendo ERP API** credential:
 
-- **ERP Host URL**: The base URL of your ERP instance (e.g., `https://demo.iw-erp.de`)
-- **API Token (JWT)**: Your API access token
+- **ERP Host URL**: the base URL of your ERP instance (e.g. `https://demo.iw-erp.de`)
+- **API Token (JWT)**: an API access token of the ERP
 
-The token can be validated via the `/api/base/api_access_token_test?mode=info` endpoint.
+Create the token in the ERP under **Settings → API Access Tokens → Create**. n8n checks it with
+`GET /api/base/api_access_token_test?mode=info` when you save the credential. The token is sent in
+the `x-iw-jwt-token` header; every request also carries `X-IW-Trigger-Source: n8n`, so changes made
+by a workflow do not fire the n8n webhooks again (no trigger loop).
 
-### JWT API Token Requirements
-
-When creating the API access token in the ERP (**Settings → API Access Tokens
-→ Create**), use these settings:
-
-| Setting | Required value | Why |
+| Token setting | Value | Why |
 |---|---|---|
-| **Scope → Webhook** | **Write** | `POST` and `DELETE` on `/api/n8n/webhook` are annotated `userAccessType=Write`. |
-| **Expiration** | Long-lived | The plugin has no refresh flow, so a short TTL will silently break webhook registration on the next activation. |
-| **URL path restriction** *(optional hardening)* | `/api/n8n/webhook` | Least-privilege — auto-registration only calls this exact path (`POST` and `DELETE`). A prefix is written with a trailing `.*` (e.g. `/api/n8n/.*`); `*` alone is not a wildcard. |
+| **Scopes** | see [API token scopes](#api-token-scopes) | per resource |
+| **Expiration** | long-lived | the node has no refresh flow; an expired token breaks the webhook registration at the next activation |
+| **URL path restriction** *(optional)* | e.g. `/api/n8n/.*` | least privilege; a prefix ends with `.*`, `*` alone is no wildcard |
 
-> **ERP version:** auto-registration requires an ERP build that ships the
-> dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
-> still need to use the manual setup path below.
+## API token scopes
 
-Those requirements apply only to the **auto-registration** feature of the
-Trigger node. If the same credential is also used by the **action node** to
-read or write data (e.g. `/api/crm/crmcompanies`, `/api/invoice/invoices`,
-…), grant the corresponding per-resource scopes in addition to Webhook — that
-is unrelated to webhook auto-registration:
+Grant the scopes of the resources a workflow uses. *Read* is enough for Get / Get Many, the other
+operations need *Write* (create) or *Edit* (change).
 
-| Resource | Scopes |
+| Resource / node | Scopes |
 |---|---|
 | Company, Person | CRM |
 | Project | CRM, CRM Project |
@@ -122,107 +110,276 @@ is unrelated to webhook auto-registration:
 | Time Entry | Time |
 | Invoice, Offer | Billing |
 | Booking, Event, Event Sign-Up | Event, Event Booking |
+| Inventory Loan | Event Booking (Read; Edit for hand over, return, extend) |
+| Occupancy | Location (Read) |
+| Usage Counter | Maintenance (Read; Edit for Update Value) |
+| Shift Plan Entry | a token of a user: Get Own, Clock In / Out for the token's own shifts; Get Many, Get Coverage for shift planners (time rights or team lead) |
+| Volunteer Hour Entry, Helper Shift | CRM |
+| Membership Pause | CRM (Read; Edit for Decide) |
+| General Meeting | CRM (Read; Edit for Check In) |
+| Notification | Notification (Write) plus Read on the recipients (CRM for persons / companies, Event for sign-ups); Get Own Notifications needs a token of a user |
 | News Article | Media |
 | Webhook (action node) | Webhook and **Allow admin functions** |
-| Smart Lock: Check Access, Lock Trigger | Event (Write) |
+| Smart Lock: Check Access, Unlock, Lock, Status; Lock Trigger | Event (Write) |
 | Smart Lock: Get, Get Many, Get Log | Event and **Allow super admin functions** |
+| inwendo ERP Trigger (auto-registration) | Webhook (Write) |
 
-When the ERP rejects a request, the node error shows the ERP's error code and
-message (`X-IW-ERROR-CODE` / `X-IW-ERROR-JSON`).
+When the ERP rejects a request, the node error shows the ERP's error code and message
+(`X-IW-ERROR-CODE` / `X-IW-ERROR-JSON`).
 
-If your ERP build is too old (no `/api/n8n/webhook`) or you simply prefer to
-manage the webhook yourself, switch **Auto Register Webhook in ERP** off on
-the Trigger node and create the `RegisteredWebhook` in the ERP UI manually
-(see [Manual setup](#manual-setup-advanced) below). In that mode the token
-only needs the scopes for the resources the action node actually calls.
+## ERP settings (feature switches)
 
-## Compatibility
+Several functions are off until they are switched on in the ERP (**Settings**). While a setting is
+off the ERP answers *feature disabled* (HTTP 400 with `X-IW-ERROR-CODE: 404` and
+`X-IW-ERROR-JSON: ["feature disabled: <setting>"]`, older functions with their own code); the node
+then fails with
 
-Requires n8n 1.85 or newer (for `NodeConnectionTypes`), including n8n 2.x;
-built against n8n-workflow 2.x. The package uses the
-`httpRequestWithAuthentication` helper (the `request`-based helpers are
-deprecated and rejected by the community node linter) and is published with
-npm provenance, which n8n requires for verified community nodes.
+> inwendo ERP: this function is switched off (ERP setting "&lt;setting&gt;")
 
-## Installation
+| Function | ERP setting |
+|---|---|
+| Timed booking events (trigger) | `integration_booking_timed_events_enabled` |
+| Occupancy | `integration_occupancy_api_enabled` |
+| `webhook_data` summary of door openings and check-ins | `integration_ha_access_events_enabled` |
+| Inventory Loan | `event_inventory_enabled` |
+| Shift Plan Entry | `shift_planning_enabled`; Clock In / Out also `shift_clocking_enabled` |
+| Volunteer Hour Entry, Helper Shift | `volunteer_hours_enabled` |
+| General Meeting | `inwendo_crm_general_meeting_enabled` |
+| Ticket SLA fields | `customer_panel_ticket_sla_enabled` (without it tickets have no `sla`) |
 
-### In n8n (Community Node)
+## inwendo ERP (action node)
 
-1. Go to **Settings > Community Nodes**
-2. Select **Install**
-3. Enter `n8n-nodes-inwendo-erp`
-4. Agree to the risks and click **Install**
+| Resource | Operations |
+|---|---|
+| Booking | Get, Get Many, Create, Update |
+| Company | Get, Get Many, Create, Update |
+| Event | Get, Get Many, Create, Update |
+| Event Sign-Up | Get, Get Many, Create, Update |
+| General Meeting | Get, Get Many, Get Participants, Check In |
+| Generic API Request | any method on any ERP endpoint |
+| Helper Shift | Get, Get Many, Create, Assign Person, Get Assignments, Set Assignment Status |
+| Inventory Loan | Get, Get Many, Hand Over, Return, Extend, Get Stock, Get Availability |
+| Invoice | Get, Get Many, Create, Get PDF |
+| Membership Pause | Get, Get Many, Decide |
+| News Article | Get, Get Many, Create, Update |
+| Notification | Send, Get Many Mass Notifications, Get Own Notifications |
+| Occupancy | Get |
+| Offer | Get, Get Many, Create, Get PDF |
+| Person | Get, Get Many, Create, Update |
+| Project | Get, Get Many, Create, Update |
+| Shift Plan Entry | Get Own, Get Many, Get, Get Coverage, Clock In, Clock Out |
+| Smart Lock | Check Access, Unlock, Lock, Status, Get, Get Many, Get Log |
+| Ticket | Get, Get Many (with SLA filter), Create, Update |
+| Time Entry | Get, Get Many, Create, Update |
+| Usage Counter | Get, Get Many, Update Value |
+| Volunteer Hour Entry | Get, Get Many, Create, Approve, Reject |
+| Webhook | Get, Get Many, Create, Update |
 
-### Local Development
+General rules:
 
-```bash
-# Clone the repository
-git clone https://github.com/inwendo/n8n-nodes-inwendo-erp.git
-cd n8n-nodes-inwendo-erp
+- **Get Many** has *Return All* (reads every page) or *Limit*.
+- **Update** uses `PATCH`, so fields you do not set keep their value.
+- Date fields take n8n dates or expressions; for ERP form fields the local time is used
+  (`2026-10-11T18:00:00+02:00` → `2026-10-11 18:00:00`).
+- Every operation returns one item per ERP object; *Continue On Fail* returns `{ "error": … }`.
 
-# Install dependencies
-npm install
+### CRM, billing, bookings, events, news, webhooks
 
-# Build
-npm run build
+Classic CRUD on the ERP entities. Invoices and offers cannot be changed through the API once
+created; creating one needs the IDs of an accounting type, a tax, a payment goal (and for invoices
+a payment type) plus the buyer name. **Get PDF** returns the PDF as binary data (`data` property).
 
-# Link to your local n8n installation
-npm link
-cd /path/to/n8n
-npm link n8n-nodes-inwendo-erp
+### Ticket
+
+Create, update and read tickets. With the ERP's service levels (`customer_panel_ticket_sla_enabled`)
+**Get** and **Get Many** add the SLA state of a ticket at the top level:
+
+| Field | Meaning |
+|---|---|
+| `sla_first_response_status`, `sla_resolution_status` | `open`, `warning` (most of the time used), `breached`, `met`, `missed` |
+| `sla_first_response_due`, `sla_resolution_due` | due date (ISO 8601) |
+| `sla_first_response_done_at`, `sla_resolution_done_at` | when it was met, or `null` |
+
+**SLA Status** on Get Many keeps only tickets whose first response or resolution has one of the
+selected states (applied to the fetched tickets; use *Return All* to scan all of them).
+
+### Inventory Loan
+
+Lending of inventory items (Inventar-Ausleihe; setting `event_inventory_enabled`).
+
+- **Get Many**: filters *State* (`LENT`, `RETURNED`, **`OVERDUE`** = lent and past the due date),
+  item (bookable), booking, person, deposit state. Default order: most urgent due date first.
+- **Hand Over**: creates the loan from a booking (item and borrower come from the booking); optional
+  quantity, due date (default: end of the booking), deposit (default: deposit of the item × quantity),
+  condition, note, *Ignore Stock Check*.
+- **Return**: condition, retained part of the deposit, note, return time.
+- **Extend**: new due date (*Ignore Stock Check* when the item is needed elsewhere).
+- **Get Stock**: every item with stock, lent, overdue and free pieces right now.
+- **Get Availability**: free pieces of one item between two dates (`{ bookable_id, quantity, used, available }`).
+
+Loans carry `person_minimal`, `bookable_minimal`, `booking_minimal`, `bookable_name`, `due_at`, `state`, `overdue`.
+
+### Shift Plan Entry
+
+The shift plan of the time tracking (`shift_planning_enabled`).
+
+- **Get Own**: the published shifts of the token's user (filter *Start From*), with the clocking state.
+- **Get Many**: the planner's list incl. drafts (start date from / until, planning group, person, status).
+- **Get Coverage**: required versus planned staff per day (from / until, at most 62 days; planning
+  group or organization).
+- **Clock In / Clock Out**: start or end the work time of an own shift of today with the real time
+  (`shift_clocking_enabled`); returns the work time entry.
+
+### Volunteer Hour Entry and Helper Shift
+
+Volunteer hours of members (`volunteer_hours_enabled`).
+
+- **Volunteer Hour Entry**: Get Many (person, status `pending` / `approved` / `rejected`, event),
+  Get, **Create** (person, work date, minutes, description, event; approved at once), **Approve**,
+  **Reject** (reason shown to the member).
+- **Helper Shift** (Helferdienste): Get Many, Get, **Create** (name, start, end, required helpers,
+  credited minutes, sign-up deadline, location, event), **Assign Person**, **Get Assignments**,
+  **Set Assignment Status** (`attended` credits the shift, `no_show` / `cancelled` remove the credit).
+
+### Membership Pause
+
+Requested membership pauses: Get Many (status `REQUESTED`, `APPROVED`, `DECLINED`, `WITHDRAWN`,
+person), Get, **Decide** (approve: the pause is written into the membership; decline; optional
+comment for the member).
+
+### General Meeting
+
+General meetings (Mitgliederversammlung, `inwendo_crm_general_meeting_enabled`): Get Many (state),
+Get (with statistics), **Get Participants** (attendance filter) and **Check In**: sets the
+attendance of a member — *On Site*, *Online* or *Absent* (check out). The node finds the participant
+of the meeting by the person ID, so a check-in desk or QR scanner workflow only needs both IDs.
+
+### Occupancy
+
+**Get** (`integration_occupancy_api_enabled`) returns one item per bookable (all, or the given IDs):
+
+```json
+{ "id": 7, "name": "Halle 1", "location_id": 2, "location_name": "Sportzentrum",
+  "occupied": true, "pre_start_active": false, "post_end_active": false,
+  "pre_start_minutes": 30, "post_end_minutes": 15,
+  "current_booking": { "id": 123, "title": "Training U12", "start": "…", "end": "…", "participants": 14 },
+  "next_booking": null,
+  "opening_hours": { "open_now": true, "next_open": null, "next_close": "…" },
+  "generated_at": "2026-10-11T17:59:30+02:00" }
 ```
 
-## Setting Up Webhooks (ERP -> n8n)
+Use it for heating, lights, door signs or to check a door opening against the bookings.
 
-To trigger n8n workflows from ERP events:
+### Usage Counter
 
-1. Add an **inwendo ERP Trigger** node to your workflow
-2. Pick the **Entity Type** and **Action** you want to listen for
-3. Select or create an **inwendo ERP API** credential on the trigger node
-4. Activate the workflow
+Meters of bookables (electricity, water, operating hours): Get Many (filter bookable), Get and
+**Update Value** (the new reading, e.g. from a smart meter). Counters fed by real usage data are
+calculated by the ERP.
 
-With **Auto Register Webhook in ERP** enabled (the default), activating the
-workflow will:
+### Notification
 
-- call `POST /api/n8n/webhook` on the ERP to register (or update) a
-  `RegisteredWebhook` row scoped to `notificationClientId = 'n8n'`,
-  pointing at n8n's production webhook URL and filtered by the selected
-  entity type and action
-- generate a random `notificationClientToken` (if you did not set one
-  manually) and persist it with the workflow so that incoming requests are
-  always validated against the `X-IW-Webhook-Token` header
+**Send** creates an ERP mass notification: one notification per recipient — person, company, event
+sign-up or membership — with title, message (Twig placeholders such as `{{ person.firstName }}`
+work), optional HTML text or ERP template, and the channels **Push (vynst app)**, E-Mail, SMS,
+WhatsApp, Letter. Every notification also appears in the app's notification list. The ERP sends
+them in the background. **Get Many Mass Notifications** lists the sent ones, **Get Own
+Notifications** the notifications of the token's own user.
 
-Deactivating the workflow calls `DELETE /api/n8n/webhook` with the same
-`webhook_url`, which soft-deletes every matching `n8n`-owned row so it no
-longer fires.
+### Smart Lock
 
-The `POST /api/n8n/webhook` endpoint is **idempotent** on
-`(webhook_url, notificationClientId = 'n8n')`: if you edit the trigger's
-entity type, action, or webhook token and re-activate, the existing row is
-updated in place instead of creating a duplicate.
+**Check Access** asks the ERP whether a credential a reader read (barcode, QR or RFID passed on by
+the workflow) may open a smart lock: the QR code the app shows for the lock, the QR code of the
+digital member card or the RFID / chip card number stored at the person. The ERP checks with the
+rules of the app (super admin, self service rights, bookable, employment contract, booking ±1 h)
+and writes the smart lock log (source `n8n`). The plain member number is not accepted, it can be
+guessed. Answer:
 
-> **ERP version:** this flow requires an ERP build that ships the
-> dedicated `N8nWebhookController` (`/api/n8n/webhook`). Older installations
-> do not support auto-registration and must use the manual setup below with
-> **Auto Register Webhook in ERP** disabled on the trigger.
+```json
+{ "granted": true, "reason": "granted", "credential_type": "card",
+  "smart_lock": { "id": 12, "name": "Haupteingang" },
+  "person": { "id": 345, "name": "Erika Mustermann" }, "opened": null }
+```
 
-### Manual setup (advanced)
+`reason` for a denial: `unknown_credential`, `no_access`, `invalid_code`, `code_expired`. With
+**Open When Granted** the ERP opens a lock of another provider (Nuki, LOQED, Home Assistant)
+itself. **Unlock / Lock / Status** act with the rights of the token's user (like the app);
+**Get, Get Many, Get Log** need a token with super admin functions.
 
-If you prefer to manage the webhook yourself (for example because multiple
-workflows share a single ERP webhook), switch **Auto Register Webhook in
-ERP** off on the trigger node. Then create a `RegisteredWebhook` in the ERP
-manually, either via the API or the admin UI:
+### Generic API Request
 
-- `notificationType`: `HTTP_POST`
-- `notificationUrl`: The **Production Webhook URL** shown on the trigger node
-- `referenceClassName`: Entity to watch (e.g., `CRMCompany`)
-- `databaseAction`: `create`, `update`, or `delete`
-- Optionally set `notificationClientToken` and configure the same value in
-  the trigger node's **Webhook Token** field
+Any method on any ERP endpoint, with query parameters and a JSON body, for everything the
+resources do not cover yet.
 
-### Webhook Payload Format
+## inwendo ERP Trigger
 
-The ERP sends the following JSON payload:
+Starts the workflow on ERP events. Pick an **Entity Type** and an **Action**:
+
+| Entity type | ERP class |
+|---|---|
+| All, Booking, Company, Event, Event Sign-Up, Invoice, News Article, Offer, Person, Project, Ticket, Time Entry | the classic entities |
+| Inventory Loan | `EventInventoryLoan` |
+| Smart Lock Log (Access) | `SmartLockLog` — every door opening / denial |
+| Check-In (Attendance List Entry) | `AttendanceListEntry` |
+| Shift (Shift Plan Entry) | `ShiftPlanEntry` |
+| Volunteer Hour Entry | `VolunteerHourEntry` |
+| Helper Shift Assignment | `VolunteerShiftAssignment` |
+| Membership Pause | `MembershipPauseRequest` |
+| General Meeting Participant | `GeneralMeetingParticipant` (response, check-in) |
+| Usage Counter | `BaseBookableUsageCounter` |
+
+Actions: *All*, *Create*, *Update*, *Delete* and the timed booking events below.
+
+### Timed booking events
+
+| Action | When |
+|---|---|
+| Booking: Pre-Start (Lead Time) | the lead time before a booking starts |
+| Booking: Start | a booking starts |
+| Booking: End | a booking ends |
+| Booking: Post-End | the lag time after a booking ended |
+| Booking: All Timed Events | all four |
+
+The trigger registers with `database_action` `booking_pre_start`, `booking_start`, `booking_end`,
+`booking_post_end` or `booking_timed` and `reference_class_name` `BaseBooking`. Timed events need
+the ERP setting `integration_booking_timed_events_enabled`; they are only sent to webhooks that ask
+for them (a trigger on *All* actions does not get them). The ERP checks every minute, so an event
+can arrive 1–2 minutes late, never twice; cancelled and deleted bookings are skipped. Lead and lag
+time come from the bookable's addon data `automation_pre_start_minutes` /
+`automation_post_end_minutes`, else from the settings
+`integration_booking_timed_events_pre_start_minutes` (30) / `…_post_end_minutes` (15).
+**Bookable IDs** limits the trigger to some bookables.
+
+The fields of the timed event are at the top level of the item, the booking is in `data`:
+
+```json
+{ "type": "booking_start", "due_at": "2026-10-11T18:00:00+02:00",
+  "booking_id": 123, "booking_title": "Training U12",
+  "start": "2026-10-11T18:00:00+02:00", "end": "2026-10-11T19:30:00+02:00",
+  "bookable_id": 7, "bookable_name": "Halle 1", "location_id": 2, "location_name": "Sportzentrum",
+  "participants": 14, "pre_start_minutes": 30, "post_end_minutes": 15,
+  "iw_action": "booking_start", "iw_entity_class": "Inwendo\\EventBundle\\Entity\\BaseBooking",
+  "iw_entity_short_class": "booking", "iw_entity_id": 123, "iw_dt": 1760131200,
+  "iw_timed_event": { … }, "data": { …booking… } }
+```
+
+### Door openings and check-ins
+
+Webhooks of *Smart Lock Log* and *Check-In* carry a `webhook_data` summary (with
+`integration_ha_access_events_enabled`); the trigger puts its fields at the top level too:
+
+```json
+{ "type": "access", "smart_lock_id": 4, "smart_lock_name": "Haupteingang", "action": "unlock",
+  "success": true, "person_id": 55, "person_name": "Max Mustermann", "source": "app", "at": "…" }
+{ "type": "check_in", "attendance_list_id": 9, "attendance_list_name": "Fitnessstudio",
+  "person_id": 55, "person_name": "Max Mustermann", "checked_in": true, "at": "…" }
+```
+
+Smart lock log actions are `unlock`, `lock`, `access_code`, `access_denied`, `status`; delete
+events carry no `webhook_data`.
+
+### Webhook payload
+
+Every other event:
 
 ```json
 {
@@ -231,29 +388,111 @@ The ERP sends the following JSON payload:
   "iw_entity_id": "123",
   "iw_action": "update",
   "iw_dt": 1709500000,
-  "data": { ... }
+  "data": { … }
 }
 ```
 
-## Tests
+The trigger filters on the class name of `iw_entity_class` (without namespace) and on `iw_action`.
+Envelope fields are never overwritten by the summaries.
 
-End-to-end tests run the compiled nodes against a real ERP instance (every
-operation of every resource, the credential test and the trigger's webhook
-registration). Without the variables they are skipped.
+### Auto-registration
+
+With **Auto Register Webhook in ERP** (default) activating the workflow
+
+- calls `POST /api/n8n/webhook` to register (or update) a `RegisteredWebhook` with
+  `notificationClientId = 'n8n'`, n8n's production webhook URL, the entity type and the action;
+- generates a random token (unless you set **Webhook Token**) and keeps it with the workflow;
+  incoming requests are validated against the `X-IW-Webhook-Token` header.
+
+Deactivating calls `DELETE /api/n8n/webhook` with the same URL. The registration is idempotent on
+`(webhook_url, notificationClientId = 'n8n')`: changing entity type, action or token and
+re-activating updates the row in place. Needs scope Webhook (Write). When timed events are switched
+off the activation fails with a message naming `integration_booking_timed_events_enabled`; an ERP
+that does not know timed events yet is reported as such.
+
+### Manual setup (advanced)
+
+For older ERPs, or when several workflows share one ERP webhook, switch **Auto Register Webhook in
+ERP** off and create the `RegisteredWebhook` in the ERP yourself:
+
+- `notificationType`: `HTTP_POST`
+- `notificationUrl`: the **Production Webhook URL** of the trigger node
+- `referenceClassName`: entity to watch (e.g. `CRMCompany`, `BaseBooking` for timed events)
+- `databaseAction`: `create`, `update`, `delete` or a timed action (`booking_start`, …)
+- optionally `notificationClientToken`, with the same value in the trigger's **Webhook Token**
+
+## inwendo ERP Lock Trigger
+
+Locks of an n8n workflow become ERP smart locks, so the ERP can open them:
+
+1. Add the trigger, list the locks (Lock ID, name in the ERP, *In the app*: open button or QR code)
+   and activate the workflow. The trigger registers its locks with its **production webhook URL**
+   at `/api/n8n/smart_lock/register` (instance id and secret are generated once and kept in the
+   workflow).
+2. In the ERP open the smart lock connection (provider n8n) and run **Sync devices**; grant access
+   to the smart locks as usual.
+3. When a user with access taps *open* in the app (or through the API / Home Assistant), the ERP
+   posts a signed command; the workflow gets `command` (`open` / `lock`), `lock_id`, `lock_name`,
+   `smart_lock_id` and switches the relay, Shelly, … .
+
+Commands are signed with HMAC-SHA256 of the instance secret (`X-IW-Signature`), carry a timestamp
+and a nonce and are rejected when they are older than 60 seconds (plus 30 seconds clock difference)
+or replayed. *Result*: report success when the command arrives, or answer with the last node (first
+item with `success: true / false`, optionally `state`). n8n must be reachable via **https** (the ERP
+rejects private addresses); test webhook URLs are not registered. Deactivating the workflow removes
+the locks from the ERP (the smart locks stay and come back with the next activation). In queue mode
+with several webhook processes the replay protection is per process. Token scope: Event (Write).
+
+## Workflow templates
+
+Importable workflows in [`templates/`](templates) (also shipped in the npm package). In n8n:
+**Workflows → Import from File** (or paste the JSON), then select the credentials, adapt the
+channels / IDs named in the sticky note and activate.
+
+| Template | What it does | Needs |
+|---|---|---|
+| [ticket-from-email-or-form.json](templates/ticket-from-email-or-form.json) | IMAP e-mails and an n8n form become ERP tickets | IMAP credential; scope Ticket |
+| [new-booking-to-slack-or-teams.json](templates/new-booking-to-slack-or-teams.json) | message in Slack (or Teams) for every new booking | Slack / Teams credential; scope Webhook |
+| [overdue-inventory-loan-reminder.json](templates/overdue-inventory-loan-reminder.json) | every morning a push + e-mail to borrowers of overdue loans | `event_inventory_enabled`; scopes Event Booking, Notification, CRM |
+| [access-outside-booking-warning.json](templates/access-outside-booking-warning.json) | warns in Slack when a door is opened while no booking (nor lead / lag time) runs | `integration_occupancy_api_enabled`, `integration_ha_access_events_enabled`; scopes Webhook, Location |
+| [monthly-usage-counter-report.json](templates/monthly-usage-counter-report.json) | CSV of all usage counters by e-mail on the first of the month | SMTP credential; scope Maintenance |
+| [reminder-before-booking-start.json](templates/reminder-before-booking-start.json) | Slack message (and optional push to caretakers) the lead time before every booking | `integration_booking_timed_events_enabled`; scope Webhook (+ Notification) |
+
+## Development and tests
+
+```bash
+npm ci
+npm run lint        # eslint
+npm run build       # tsc + icons
+npm test            # build + offline unit tests (test/unit)
+npm run test:e2e    # build + end-to-end tests against a live ERP (test/e2e)
+```
+
+The **unit tests** run without an ERP: request helpers and pagination, error and *feature
+disabled* messages, the requests of every resource, the trigger (registration, timed events,
+filters, output), the lock trigger's registration and signatures, and the workflow templates.
+
+The **end-to-end tests** run the compiled nodes against a real ERP (every CRUD resource, the
+credential test, the trigger registration incl. every entity type and timed events, the read
+operations of the new resources). Without the variables they are skipped:
 
 ```bash
 IW_E2E_ERP_HOST=https://erp.example.com IW_E2E_ERP_TOKEN=<jwt> npm run test:e2e
 ```
 
-The token needs the scopes listed above plus "Allow admin functions". Set
-`IW_E2E_PDF=1` if the instance can render PDFs and `IW_E2E_SMART_LOCK_ID` to a
-smart lock for the access check. `npm test` runs offline tests, among them the
-lock trigger's registration and signature checks.
+The token needs the scopes above plus "Allow admin functions". Set `IW_E2E_PDF=1` if the instance
+can render PDFs and `IW_E2E_SMART_LOCK_ID` to a smart lock for the access check. Functions whose ERP
+setting is off pass when the node names the setting.
 
-## API Endpoints
+Layout: `nodes/InwendoErp/InwendoErp.node.ts` (action node, CRUD resources),
+`ResourceActions.ts` (the action resources), `descriptions/` (parameters per resource),
+`GenericFunctions.ts` (requests, pagination, errors), `InwendoErpTrigger.node.ts`,
+`InwendoErpLockTrigger.node.ts` + `LockProtocol.ts`, `credentials/`, `templates/`, `test/`.
 
-| Resource | API Path |
-|----------|----------|
+## API endpoints
+
+| Resource | API path |
+|---|---|
 | Company | `/api/crm/crmcompanies` |
 | Person | `/api/crm/crmpeople` |
 | Project | `/api/crm/crmprojects` |
@@ -266,7 +505,17 @@ lock trigger's registration and signature checks.
 | Event Sign-Up | `/api/event/base_event_signup` |
 | News Article | `/api/media/news_article` |
 | Webhook | `/api/dw/webhook` |
+| Inventory Loan | `/api/event/inventory_loan` (+ `/{id}/return`, `/{id}/extend`), `/api/event/inventory_loan_stock`, `/api/event/inventory_loan_availability/{bookableId}` |
+| Shift Plan Entry | `/api/time/shift_plan_entry` (+ `/own`, `/coverage`, `/{id}/clock_in`, `/{id}/clock_out`) |
+| Volunteer Hour Entry | `/api/time/volunteer_hour_entry` (+ `/{id}/approve`, `/{id}/reject`) |
+| Helper Shift | `/api/time/volunteer_shift`, `/api/time/volunteer_shift_assignment` |
+| Membership Pause | `/api/crm/membership_pause_request` (+ `/{id}/decide`) |
+| General Meeting | `/api/crm/general_meeting`, `/api/crm/general_meeting_participant` |
+| Occupancy | `/api/event/bookable_occupancy` |
+| Usage Counter | `/api/event/base_bookable_usage_counter` |
+| Notification | `/api/notification/mass_notification`, `/api/notification/user_notification` |
 | Smart Lock | `/api/event/smart_lock`, `/api/event/smart_lock_log`, `/api/n8n/smart_lock/check_access` |
+| Trigger | `/api/n8n/webhook` (POST / DELETE) |
 | Lock Trigger | `/api/n8n/smart_lock/register` (POST / DELETE) |
 
 ## License

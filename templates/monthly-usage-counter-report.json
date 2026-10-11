@@ -1,0 +1,186 @@
+{
+  "name": "inwendo ERP: monthly usage counter report",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Monthly usage counter report\nOn the first of every month: all usage counters (meters) of the bookables as CSV by e-mail.\n\nToken scope Maintenance (read); set the SMTP credential and the addresses.",
+        "height": 220,
+        "width": 560
+      },
+      "id": "38925d99-6684-55f4-902c-c310f6df2103",
+      "name": "About this template",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 1,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "1ba89a5e-6c27-5244-b5ec-63b1f6af89ac",
+      "name": "First of the Month",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "usageCounter",
+        "operation": "getAll",
+        "returnAll": true,
+        "usageCounterBookable": ""
+      },
+      "id": "8e127c1f-1e5e-556d-b128-f7876f80334b",
+      "name": "Usage Counters",
+      "type": "n8n-nodes-inwendo-erp.inwendoErp",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "78104c00-a693-5c0f-a71a-aaabad9f8273",
+              "name": "Counter",
+              "value": "={{ $json.name || $json.token || $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "4fe45b31-0f5f-515e-b33a-4b0668aaf4aa",
+              "name": "Value",
+              "value": "={{ $json.counter_value }}",
+              "type": "string"
+            },
+            {
+              "id": "55a4460e-3f55-568f-b485-7508178bd9ef",
+              "name": "Unit",
+              "value": "={{ $json.counter_unit }}",
+              "type": "string"
+            },
+            {
+              "id": "c68ab272-28bd-535c-b0a8-26d7845ef44e",
+              "name": "Updated",
+              "value": "={{ $json.updated }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed689865-c981-5b9f-bf1e-5984e93fa466",
+      "name": "Report Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "=usage-counters-{{ $now.toFormat('yyyy-MM') }}.csv"
+        }
+      },
+      "id": "003401d8-607e-5140-bb4c-9b045134975d",
+      "name": "CSV",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "erp@example.com",
+        "toEmail": "facility@example.com",
+        "subject": "=Usage counters {{ $now.minus({ months: 1 }).toFormat('MMMM yyyy') }}",
+        "emailFormat": "text",
+        "text": "The readings of all usage counters are attached.",
+        "options": {
+          "attachments": "data"
+        }
+      },
+      "id": "74cc2b58-6a67-5379-b17a-a8f8b4bc1a7e",
+      "name": "Send Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "First of the Month": {
+      "main": [
+        [
+          {
+            "node": "Usage Counters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usage Counters": {
+      "main": [
+        [
+          {
+            "node": "Report Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Row": {
+      "main": [
+        [
+          {
+            "node": "CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CSV": {
+      "main": [
+        [
+          {
+            "node": "Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

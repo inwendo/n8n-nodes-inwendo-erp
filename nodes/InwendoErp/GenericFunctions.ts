@@ -23,17 +23,67 @@ const DEFAULT_HEADERS = {
 };
 
 /**
+ * Older ERP functions that are switched off by a setting answer with their own error code
+ * (or message) instead of the generic "feature disabled" answer. Maps them to the setting.
+ */
+const LEGACY_FEATURE_ERRORS: Array<{ code?: string; message?: RegExp; setting: string }> = [
+	{ code: '1585', setting: 'event_inventory_enabled' },
+	{ code: '1640', setting: 'inwendo_crm_general_meeting_enabled' },
+	{ code: '6090', setting: 'volunteer_hours_enabled' },
+	{ message: /Shift planning is not enabled/i, setting: 'shift_planning_enabled' },
+	{ message: /Shift clocking is not enabled/i, setting: 'shift_clocking_enabled' },
+];
+
+/**
+ * The ERP setting a "feature disabled" answer names, or undefined for any other error.
+ * New functions answer HTTP 400 with X-IW-ERROR-CODE 404 and
+ * X-IW-ERROR-JSON ["feature disabled: <setting id>"]; only the headers count, not the status.
+ */
+export function featureDisabledSetting(code: unknown, details: unknown): string | undefined {
+	const text = details === undefined || details === null ? '' : String(details);
+	const match = /feature disabled:\s*([A-Za-z0-9_.-]+)/i.exec(text);
+	if (match) {
+		return match[1];
+	}
+	const codeString = code === undefined || code === null ? '' : String(code);
+	for (const known of LEGACY_FEATURE_ERRORS) {
+		if (known.code && known.code === codeString) {
+			return known.setting;
+		}
+		if (known.message && codeString && known.message.test(text)) {
+			return known.setting;
+		}
+	}
+	return undefined;
+}
+
+function errorHeaders(error: unknown): Record<string, unknown> {
+	const err = error as any;
+	return (
+		err?.response?.headers ?? err?.cause?.response?.headers ?? err?.context?.response?.headers ?? err?.headers ?? {}
+	);
+}
+
+/**
  * The ERP answers errors with a generic body and puts the real reason into the
  * X-IW-ERROR-CODE / X-IW-ERROR-JSON headers; surface them in the n8n error.
+ * A function switched off in the ERP gets a message naming the setting to enable.
  */
 export function toNodeApiError(node: ReturnType<InwendoErpContext['getNode']>, error: unknown): NodeApiError {
-	const err = error as any;
-	const headers =
-		err?.response?.headers ?? err?.cause?.response?.headers ?? err?.context?.response?.headers ?? err?.headers ?? {};
+	const headers = errorHeaders(error);
 	const code = headers['x-iw-error-code'];
 	const details = headers['x-iw-error-json'];
 	if (!code && !details) {
 		return new NodeApiError(node, error as JsonObject);
+	}
+	const setting = featureDisabledSetting(code, details);
+	if (setting) {
+		return new NodeApiError(node, error as JsonObject, {
+			message: `inwendo ERP: this function is switched off (ERP setting "${setting}")`,
+			description:
+				`Enable the setting "${setting}" in the ERP (Settings) to use this operation. ` +
+				`ERP answer: ${code ?? ''} ${details ?? ''}`.trim(),
+		});
 	}
 	return new NodeApiError(node, error as JsonObject, {
 		message: `inwendo ERP error${code ? ` ${code}` : ''}`,
@@ -170,4 +220,26 @@ export async function inwendoErpApiRequestAllItems(
 	}
 
 	return allItems;
+}
+
+/**
+ * A list request with the usual "Return All" / "Limit" options: all pages, or the first
+ * page with `limit` items (the ERP only honours pageSize together with a 0-based page).
+ */
+export async function inwendoErpApiRequestList(
+	this: IExecuteFunctions,
+	endpoint: string,
+	qs: IDataObject,
+	returnAll: boolean,
+	limit: number,
+): Promise<any[]> {
+	if (returnAll) {
+		return await inwendoErpApiRequestAllItems.call(this, 'GET', endpoint, qs);
+	}
+	const items = await inwendoErpApiRequest.call(this, 'GET', endpoint, undefined, {
+		...qs,
+		page: '0',
+		pageSize: String(limit),
+	});
+	return Array.isArray(items) ? items.slice(0, limit) : itemsOf(items);
 }

@@ -1,0 +1,105 @@
+{
+  "name": "inwendo ERP: reminder before a booking starts",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Reminder before a booking starts\nTimed booking event \"Pre-Start\": the ERP calls the workflow the lead time before every booking (bookable addon data automation_pre_start_minutes, default 30 minutes).\n\nNeeds the ERP setting integration_booking_timed_events_enabled. Optionally limit to some bookables (Bookable IDs on the trigger).",
+        "height": 220,
+        "width": 560
+      },
+      "id": "38925d99-6684-55f4-902c-c310f6df2103",
+      "name": "About this template",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "autoRegister": true,
+        "action": "booking_pre_start",
+        "bookableFilter": ""
+      },
+      "id": "1b76fcda-1fed-5b52-8ed9-8638a1f84b56",
+      "name": "Lead Time Starts",
+      "type": "n8n-nodes-inwendo-erp.inwendoErpTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#caretaker",
+          "mode": "name"
+        },
+        "text": "=In {{ $json.pre_start_minutes }} minutes: {{ $json.booking_title }} in {{ $json.bookable_name }} ({{ $json.location_name }}), {{ DateTime.fromISO($json.start).toFormat('HH:mm') }}–{{ DateTime.fromISO($json.end).toFormat('HH:mm') }}{{ $json.participants ? ', ' + $json.participants + ' participants' : '' }}",
+        "otherOptions": {}
+      },
+      "id": "100e4f21-64db-5be0-973c-6767a0e94238",
+      "name": "Remind in Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "notification",
+        "operation": "send",
+        "recipientType": "person",
+        "recipientIds": "12,34",
+        "text": "=Soon: {{ $json.booking_title }} in {{ $json.bookable_name }}",
+        "longText": "=Starts at {{ DateTime.fromISO($json.start).toFormat('HH:mm') }}. Please unlock and prepare the room.",
+        "channels": [
+          "sendPush"
+        ],
+        "additionalFields": {}
+      },
+      "id": "6347975a-cbf2-564d-93af-71d169b2bd93",
+      "name": "Push to Caretakers",
+      "type": "n8n-nodes-inwendo-erp.inwendoErp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        100
+      ],
+      "disabled": true,
+      "notes": "Set the person IDs of the caretakers, then enable",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Lead Time Starts": {
+      "main": [
+        [
+          {
+            "node": "Remind in Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Push to Caretakers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

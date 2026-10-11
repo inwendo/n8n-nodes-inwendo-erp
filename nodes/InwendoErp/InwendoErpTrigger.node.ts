@@ -9,7 +9,51 @@ import type {
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { randomBytes } from 'crypto';
 
-import { inwendoErpApiRequest } from './GenericFunctions';
+import { featureDisabledSetting, inwendoErpApiRequest } from './GenericFunctions';
+
+/** Timed booking events (ERP setting integration_booking_timed_events_enabled). */
+export const TIMED_BOOKING_ACTIONS = ['booking_pre_start', 'booking_start', 'booking_end', 'booking_post_end'];
+const TIMED_ALL = 'booking_timed';
+const TIMED_SETTING = 'integration_booking_timed_events_enabled';
+
+export function isTimedAction(action: string): boolean {
+	return action === TIMED_ALL || TIMED_BOOKING_ACTIONS.includes(action);
+}
+
+/** Whether an incoming iw_action matches the configured action of the trigger. */
+export function actionMatches(configured: string, incoming: string): boolean {
+	if (configured === 'all') {
+		return true;
+	}
+	if (configured === TIMED_ALL) {
+		return TIMED_BOOKING_ACTIONS.includes(incoming);
+	}
+	return configured === incoming;
+}
+
+/** "7, 8" -> ["7", "8"] */
+function bookableIds(value: unknown): string[] {
+	return String(value ?? '')
+		.split(',')
+		.map((part) => part.trim())
+		.filter((part) => part !== '');
+}
+
+/**
+ * The workflow item of an ERP webhook: the envelope as sent, plus the summary objects
+ * (iw_timed_event of timed booking events, webhook_data of smart lock log / check-in events)
+ * at the top level. Envelope keys are never overwritten.
+ */
+export function triggerOutput(body: IDataObject): IDataObject {
+	const summary: IDataObject = {};
+	for (const key of ['iw_timed_event', 'webhook_data']) {
+		const value = body[key];
+		if (value && typeof value === 'object' && !Array.isArray(value)) {
+			Object.assign(summary, value as IDataObject);
+		}
+	}
+	return { ...summary, ...body };
+}
 
 export class InwendoErpTrigger implements INodeType {
 	description: INodeTypeDescription = {
@@ -74,16 +118,30 @@ export class InwendoErpTrigger implements INodeType {
 					{ name: 'Booking', value: 'BaseBooking' },
 					{ name: 'Company', value: 'CRMCompany' },
 					{ name: 'Event', value: 'BaseEvent' },
+					{ name: 'Check-In (Attendance List Entry)', value: 'AttendanceListEntry' },
 					{ name: 'Event Sign-Up', value: 'BaseEventSignUp' },
+					{ name: 'General Meeting Participant', value: 'GeneralMeetingParticipant' },
+					{ name: 'Helper Shift Assignment', value: 'VolunteerShiftAssignment' },
+					{ name: 'Inventory Loan', value: 'EventInventoryLoan' },
 					{ name: 'Invoice', value: 'Invoice' },
+					{ name: 'Membership Pause', value: 'MembershipPauseRequest' },
 					{ name: 'News Article', value: 'MediaNewsArticle' },
 					{ name: 'Offer', value: 'Offer' },
 					{ name: 'Person', value: 'CRMPerson' },
 					{ name: 'Project', value: 'CRMProject' },
+					{ name: 'Shift (Shift Plan Entry)', value: 'ShiftPlanEntry' },
+					{ name: 'Smart Lock Log (Access)', value: 'SmartLockLog' },
 					{ name: 'Ticket', value: 'CustomerTicket' },
 					{ name: 'Time Entry', value: 'TimeEntry' },
+					{ name: 'Usage Counter', value: 'BaseBookableUsageCounter' },
+					{ name: 'Volunteer Hour Entry', value: 'VolunteerHourEntry' },
 				],
 				default: 'all',
+				displayOptions: {
+					hide: {
+						action: [...TIMED_BOOKING_ACTIONS, TIMED_ALL],
+					},
+				},
 				description: 'The entity type to listen for. Select "All" to receive all events.',
 			},
 			{
@@ -95,9 +153,54 @@ export class InwendoErpTrigger implements INodeType {
 					{ name: 'Create', value: 'create' },
 					{ name: 'Update', value: 'update' },
 					{ name: 'Delete', value: 'delete' },
+					{
+						name: 'Booking: Pre-Start (Lead Time)',
+						value: 'booking_pre_start',
+						description: 'The lead time before a booking starts (e.g. 30 minutes before: heating on, open the door)',
+					},
+					{ name: 'Booking: Start', value: 'booking_start', description: 'A booking starts' },
+					{ name: 'Booking: End', value: 'booking_end', description: 'A booking ends' },
+					{
+						name: 'Booking: Post-End',
+						value: 'booking_post_end',
+						description: 'The lag time after a booking ended (e.g. 15 minutes after: lights off, lock the door)',
+					},
+					{
+						name: 'Booking: All Timed Events',
+						value: 'booking_timed',
+						description: 'Pre-start, start, end and post-end of every booking',
+					},
 				],
 				default: 'all',
-				description: 'The action to listen for. Select "All" to receive all actions.',
+				description:
+					'The action to listen for. Select "All" to receive all create / update / delete actions. The timed booking events are sent by the ERP at the time of the booking (ERP setting integration_booking_timed_events_enabled).',
+			},
+			{
+				displayName:
+					'Timed booking events need the ERP setting <b>integration_booking_timed_events_enabled</b>. Lead and lag time: ' +
+					'bookable addon data <b>automation_pre_start_minutes</b> / <b>automation_post_end_minutes</b>, else the settings ' +
+					'integration_booking_timed_events_pre_start_minutes (30) / _post_end_minutes (15). Events can arrive 1-2 minutes late.',
+				name: 'timedNotice',
+				type: 'notice',
+				default: '',
+				displayOptions: {
+					show: {
+						action: [...TIMED_BOOKING_ACTIONS, TIMED_ALL],
+					},
+				},
+			},
+			{
+				displayName: 'Bookable IDs',
+				name: 'bookableFilter',
+				type: 'string',
+				default: '',
+				placeholder: '7,8',
+				displayOptions: {
+					show: {
+						action: [...TIMED_BOOKING_ACTIONS, TIMED_ALL],
+					},
+				},
+				description: 'Only timed events of these bookables (comma-separated IDs; empty: all bookables)',
 			},
 			{
 				displayName: 'Webhook Token',
@@ -150,8 +253,10 @@ export class InwendoErpTrigger implements INodeType {
 				}
 
 				const webhookUrl = this.getNodeWebhookUrl('default') as string;
-				const entityType = this.getNodeParameter('entityType') as string;
 				const action = this.getNodeParameter('action') as string;
+				const timed = isTimedAction(action);
+				// timed events only exist for bookings
+				const entityType = timed ? 'BaseBooking' : (this.getNodeParameter('entityType', 'all') as string);
 				let token = this.getNodeParameter('webhookToken', '') as string;
 
 				// If no token is supplied, auto-generate one and persist it in
@@ -170,12 +275,15 @@ export class InwendoErpTrigger implements INodeType {
 					webhook_token: token,
 				};
 
-				const response = await inwendoErpApiRequest.call(
-					this,
-					'POST',
-					'/api/n8n/webhook',
-					body,
-				);
+				let response: any;
+				try {
+					response = await inwendoErpApiRequest.call(this, 'POST', '/api/n8n/webhook', body);
+				} catch (error) {
+					if (timed) {
+						throw timedRegistrationError(this, error);
+					}
+					throw error;
+				}
 
 				const webhookId = response?.webhook_id;
 				if (!webhookId) {
@@ -255,8 +363,11 @@ export class InwendoErpTrigger implements INodeType {
 			}
 		}
 
-		// Filter by entity type
-		const entityType = this.getNodeParameter('entityType') as string;
+		const action = this.getNodeParameter('action') as string;
+		const timed = isTimedAction(action);
+
+		// Filter by entity type (timed events are booking events)
+		const entityType = timed ? 'all' : (this.getNodeParameter('entityType', 'all') as string);
 		if (entityType !== 'all') {
 			const incomingEntityClass = (body.iw_entity_class as string) || '';
 			const incomingShortClass = (body.iw_entity_short_class as string) || '';
@@ -271,10 +382,17 @@ export class InwendoErpTrigger implements INodeType {
 		}
 
 		// Filter by action
-		const action = this.getNodeParameter('action') as string;
-		if (action !== 'all') {
-			const incomingAction = (body.iw_action as string) || '';
-			if (incomingAction !== action) {
+		if (!actionMatches(action, (body.iw_action as string) || '')) {
+			return {
+				webhookResponse: 'Filtered',
+			};
+		}
+
+		// Filter timed events by bookable
+		if (timed) {
+			const wanted = bookableIds(this.getNodeParameter('bookableFilter', ''));
+			const timedEvent = (body.iw_timed_event as IDataObject) || {};
+			if (wanted.length > 0 && !wanted.includes(String(timedEvent.bookable_id ?? ''))) {
 				return {
 					webhookResponse: 'Filtered',
 				};
@@ -282,7 +400,32 @@ export class InwendoErpTrigger implements INodeType {
 		}
 
 		return {
-			workflowData: [this.helpers.returnJsonArray(body)],
+			workflowData: [this.helpers.returnJsonArray(triggerOutput(body))],
 		};
 	}
+}
+
+/**
+ * A failed registration of timed booking events: the setting is off, or the ERP is too old to
+ * know the timed database actions.
+ */
+function timedRegistrationError(ctx: IHookFunctions, error: unknown): Error {
+	const err = error as any;
+	const description = String(err?.description ?? '');
+	const setting = featureDisabledSetting(undefined, description) ?? featureDisabledSetting(undefined, err?.message);
+	if (setting || /switched off/.test(String(err?.message ?? ''))) {
+		return new NodeOperationError(
+			ctx.getNode(),
+			`Timed booking events are switched off in the inwendo ERP. Enable the ERP setting "${setting ?? TIMED_SETTING}".`,
+		);
+	}
+	if (/database_action/.test(description)) {
+		return new NodeOperationError(
+			ctx.getNode(),
+			'This inwendo ERP does not support timed booking events yet (update the ERP, then enable the setting ' +
+				`"${TIMED_SETTING}").`,
+			{ description },
+		);
+	}
+	return err instanceof Error ? err : new Error(String(error));
 }

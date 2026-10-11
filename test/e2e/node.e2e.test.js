@@ -11,6 +11,8 @@
  * the default billing entities (tax, accounting types, payment type / goal).
  * Set IW_E2E_PDF=1 when the ERP can render PDFs (LaTeX service), IW_E2E_SMART_LOCK_ID to the id of
  * a smart lock for the access check (Scope event).
+ * The resources behind ERP settings (inventory loans, shifts, volunteer hours, general meetings,
+ * occupancy, timed booking events) pass when the setting is off and the node names the setting.
  * Without IW_E2E_ERP_HOST / IW_E2E_ERP_TOKEN every test is skipped.
  */
 const { describe, it, before } = require('node:test');
@@ -273,6 +275,44 @@ describe('inwendo ERP node against a live ERP', { skip }, () => {
 		}
 	});
 
+	/**
+	 * Read operations of the resources behind ERP settings: they either work or fail with the
+	 * "switched off" message naming the setting (or a missing scope of the token).
+	 */
+	for (const [label, params] of [
+		['inventory loan: overdue loans', { resource: 'inventoryLoan', operation: 'getAll', returnAll: false, limit: 5, filters: { state: 'OVERDUE' } }],
+		['inventory loan: stock', { resource: 'inventoryLoan', operation: 'getStock' }],
+		['shift plan entry: own shifts', { resource: 'shiftPlanEntry', operation: 'getOwn', returnAll: false, limit: 5 }],
+		['volunteer hour entries', { resource: 'volunteerHourEntry', operation: 'getAll', returnAll: false, limit: 5 }],
+		['helper shifts', { resource: 'helperShift', operation: 'getAll', returnAll: false, limit: 5 }],
+		['membership pauses', { resource: 'membershipPause', operation: 'getAll', returnAll: false, limit: 5, filters: { status: 'REQUESTED' } }],
+		['general meetings', { resource: 'generalMeeting', operation: 'getAll', returnAll: false, limit: 5 }],
+		['occupancy', { resource: 'occupancy', operation: 'get', occupancyBookables: '' }],
+		['usage counters', { resource: 'usageCounter', operation: 'getAll', returnAll: false, limit: 5 }],
+		['mass notifications', { resource: 'notification', operation: 'getAll', returnAll: false, limit: 5 }],
+		['tickets with SLA fields', { resource: 'ticket', operation: 'getAll', returnAll: false, limit: 5, slaStatus: [] }],
+	]) {
+		it(label, async (t) => {
+			try {
+				const items = await runNode(params);
+				assert.ok(Array.isArray(items));
+				if (params.resource === 'occupancy') {
+					for (const item of items) assert.ok('occupied' in item.json && 'generated_at' in item.json);
+				}
+			} catch (error) {
+				if (/switched off \(ERP setting "[\w.-]+"\)/.test(error.message)) {
+					t.diagnostic(`${label}: ${error.message}`);
+					return;
+				}
+				if (/inwendo ERP error 40[13]/.test(error.message)) {
+					t.diagnostic(`${label}: the token lacks the scope (${error.message})`);
+					return;
+				}
+				throw error;
+			}
+		});
+	}
+
 	it('an ERP error surfaces as a node error', async () => {
 		await assert.rejects(runNode({ resource: 'company', operation: 'get', companyId: '999999999' }), (error) => {
 			assert.match(error.message, /inwendo ERP error 404/);
@@ -329,6 +369,22 @@ describe('inwendo ERP Trigger against a live ERP', { skip }, () => {
 			assert.equal(await hooks.create(), true, entityType);
 			assert.equal(await hooks.delete(), true, entityType);
 		}
+	});
+
+	it('timed booking events register or name their setting', async (t) => {
+		const hooks = triggerHooks({ autoRegister: true, action: 'booking_timed', bookableFilter: '', webhookToken: '' }, `${webhookUrl}/timed`);
+		try {
+			assert.equal(await hooks.create(), true);
+		} catch (error) {
+			if (/integration_booking_timed_events_enabled/.test(error.message)) {
+				t.diagnostic(error.message);
+				return;
+			}
+			throw error;
+		}
+		const row = await erp('GET', `/api/dw/webhook/${hooks.staticData.webhookId}`);
+		assert.equal(row.database_action, 'booking_timed');
+		assert.equal(await hooks.delete(), true);
 	});
 
 	it('manual mode never touches the ERP', async () => {
