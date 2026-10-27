@@ -1,4 +1,5 @@
-# Publishes the package to npm when a version tag is pushed (`npm run release` creates it).
+# Publishes the package to npm when a version tag is pushed (`npm run release` creates it)
+# or when the workflow is started by hand.
 #
 # n8n requires npm provenance for verified community nodes (since May 1 2026): the package must be
 # published from GitHub Actions, never from a local machine. Provenance needs `id-token: write`.
@@ -13,6 +14,8 @@ on:
   push:
     tags:
       - '*.*.*'
+  # Manual start (Actions tab or API) publishes the version in package.json.
+  workflow_dispatch:
 
 jobs:
   publish:
