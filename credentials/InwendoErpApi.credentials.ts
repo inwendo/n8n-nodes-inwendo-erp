@@ -28,7 +28,7 @@ export class InwendoErpApi implements ICredentialType {
 			name: 'host',
 			type: 'string',
 			default: '',
-			placeholder: 'https://your-club.vynst.de',
+			placeholder: 'https://demo.iw-erp.de',
 			required: true,
 			description: 'The base URL of your vynst installation (without trailing slash)',
 		},
