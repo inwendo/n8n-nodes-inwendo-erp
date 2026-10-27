@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Ticket from e-mail or form\nEvery e-mail of the IMAP mailbox and every form submission becomes an ERP ticket.\n\nSet the IMAP credential, vynst (vynst (inwendo ERP)) credential (scope Ticket; with the CRM Project scope add a Project ID) and activate.",
+        "content": "## Ticket from e-mail or form\nEvery e-mail of the IMAP mailbox and every form submission becomes an ERP ticket.\n\nSet the IMAP credential, the vynst (inwendo ERP) credential (scope Ticket; with the CRM Project scope add a Project ID) and activate.",
         "height": 220,
         "width": 560
       },

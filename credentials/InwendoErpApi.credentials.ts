@@ -30,7 +30,7 @@ export class InwendoErpApi implements ICredentialType {
 			default: '',
 			placeholder: 'https://demo.iw-erp.de',
 			required: true,
-			description: 'The base URL of your vynst (vynst (inwendo ERP)) installation (without trailing slash)',
+			description: 'The base URL of your vynst (inwendo ERP) installation (without trailing slash)',
 		},
 		{
 			displayName: 'API Token (JWT)',

@@ -64,7 +64,7 @@ export class InwendoErpTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["entityType"] + " " + $parameter["action"]}}',
-		description: 'Starts the workflow when a vynst (vynst (inwendo ERP)) event occurs via webhook',
+		description: 'Starts the workflow when a vynst (inwendo ERP) event occurs via webhook',
 		defaults: {
 			name: 'vynst (inwendo ERP) Trigger',
 		},
@@ -91,12 +91,12 @@ export class InwendoErpTrigger implements INodeType {
 				type: 'boolean',
 				default: true,
 				description:
-					'Whether to automatically create the matching RegisteredWebhook in vynst (vynst (inwendo ERP)) when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid vynst (inwendo ERP) API credentials must be configured on this node.',
+					'Whether to automatically create the matching RegisteredWebhook in vynst (inwendo ERP) when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid vynst (inwendo ERP) API credentials must be configured on this node.',
 			},
 			{
 				displayName:
 					'Auto-registration requires the JWT token configured above to have ' +
-					'Scope <b>Webhook</b> with <b>Write</b> access, and vynst (vynst (inwendo ERP)) ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access, and vynst (inwendo ERP) ' +
 					'instance must provide the dedicated <b>/api/n8n/webhook</b> ' +
 					'controller. Older ERP builds do not support this flow - turn ' +
 					'this toggle off and configure the webhook manually in the ERP UI. ' +
@@ -430,13 +430,13 @@ function timedRegistrationError(ctx: IHookFunctions, error: unknown): NodeApiErr
 	if (setting || /switched off/.test(String(err?.message ?? ''))) {
 		return new NodeOperationError(
 			ctx.getNode(),
-			`Timed booking events are switched off in vynst (vynst (inwendo ERP)). Enable the ERP setting "${setting ?? TIMED_SETTING}".`,
+			`Timed booking events are switched off in vynst (inwendo ERP). Enable the ERP setting "${setting ?? TIMED_SETTING}".`,
 		);
 	}
 	if (/database_action/.test(description)) {
 		return new NodeOperationError(
 			ctx.getNode(),
-			'This vynst (vynst (inwendo ERP)) installation does not support timed booking events yet (update the ERP, then enable the setting ' +
+			'This vynst (inwendo ERP) installation does not support timed booking events yet (update the ERP, then enable the setting ' +
 				`"${TIMED_SETTING}").`,
 			{ description },
 		);

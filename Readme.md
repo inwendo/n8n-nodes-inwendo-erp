@@ -40,7 +40,7 @@ timed booking events, door openings, check-ins) and offer locks of a workflow to
 ## Requirements
 
 - n8n 1.85 or newer (for `NodeConnectionTypes`), including n8n 2.x; built against n8n-workflow 2.x
-- A vynst (vynst (inwendo ERP)) installation with the `/api/n8n/*` endpoints (`N8nWebhookController`) for the trigger's
+- A vynst (inwendo ERP) installation with the `/api/n8n/*` endpoints (`N8nWebhookController`) for the trigger's
   auto-registration and the lock trigger. Older ERPs work with a manually created webhook
   ([Manual setup](#manual-setup-advanced)).
 - Timed booking events and the occupancy need an ERP that ships them (see

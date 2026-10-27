@@ -138,7 +138,7 @@ async function buildOptions(
 }
 
 /**
- * Make an authenticated request to vynst (vynst (inwendo ERP)) API.
+ * Make an authenticated request to the vynst (inwendo ERP) API.
  */
 export async function inwendoErpApiRequest(
 	this: InwendoErpContext,
@@ -161,7 +161,7 @@ export async function inwendoErpApiRequest(
 }
 
 /**
- * Download a binary file (e.g. an invoice PDF) from vynst (vynst (inwendo ERP)) API.
+ * Download a binary file (e.g. an invoice PDF) from the vynst (inwendo ERP) API.
  */
 export async function inwendoErpApiRequestBinary(
 	this: IExecuteFunctions,
@@ -201,7 +201,7 @@ function itemsOf(responseBody: ErpResponse): IDataObject[] {
 const MAX_PAGES_WITHOUT_COUNT = 1000;
 
 /**
- * Fetch all items across paginated results from vynst (vynst (inwendo ERP)) API.
+ * Fetch all items across paginated results from the vynst (inwendo ERP) API.
  * Pages are 0-based. With `withMaxPageNumber` the ERP reports the number of
  * pages in the X-IW-MAX-PAGES header; without a usable count the pages are
  * read until one comes back empty.
