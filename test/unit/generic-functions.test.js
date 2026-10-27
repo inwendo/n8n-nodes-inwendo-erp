@@ -64,7 +64,7 @@ describe('inwendoErpApiRequest', () => {
 		});
 		const ctx = context({ fail: error });
 		await assert.rejects(inwendoErpApiRequest.call(ctx, 'POST', '/api/x', { data: {} }), (err) => {
-			assert.equal(err.message, 'inwendo ERP error 1300');
+			assert.equal(err.message, 'vynst error 1300');
 			assert.equal(err.description, '["Invalid Form"]');
 			return true;
 		});
@@ -90,7 +90,7 @@ describe('feature switched off in the ERP', () => {
 		});
 		const ctx = context({ fail: error });
 		await assert.rejects(inwendoErpApiRequest.call(ctx, 'GET', '/api/event/bookable_occupancy'), (err) => {
-			assert.equal(err.message, 'inwendo ERP: this function is switched off (ERP setting "integration_occupancy_api_enabled")');
+			assert.equal(err.message, 'vynst: this function is switched off (ERP setting "integration_occupancy_api_enabled")');
 			assert.match(err.description, /Enable the setting "integration_occupancy_api_enabled"/);
 			return true;
 		});
@@ -111,7 +111,7 @@ describe('feature switched off in the ERP', () => {
 			response: { status: 404, headers: { 'x-iw-error-code': '404', 'x-iw-error-json': '{"message":"Loan not found"}' } },
 		});
 		await assert.rejects(inwendoErpApiRequest.call(context({ fail: error }), 'GET', '/api/x'), (err) => {
-			assert.equal(err.message, 'inwendo ERP error 404');
+			assert.equal(err.message, 'vynst error 404');
 			return true;
 		});
 	});

@@ -270,7 +270,7 @@ describe('inwendo ERP node against a live ERP', { skip }, () => {
 			const log = await runNode({ resource: 'smartLock', operation: 'getLog', logSmartLockId: smartLockId, returnAll: false, limit: 5 });
 			assert.ok(log.some((item) => item.json.action === 'access_denied' && item.json.source === 'n8n'));
 		} catch (error) {
-			if (!/inwendo ERP error 403/.test(error.message)) throw error;
+			if (!/vynst error 403/.test(error.message)) throw error;
 			t.diagnostic('smart lock log skipped: the token has no super admin functions');
 		}
 	});
@@ -304,7 +304,7 @@ describe('inwendo ERP node against a live ERP', { skip }, () => {
 					t.diagnostic(`${label}: ${error.message}`);
 					return;
 				}
-				if (/inwendo ERP error 40[13]/.test(error.message)) {
+				if (/vynst error 40[13]/.test(error.message)) {
 					t.diagnostic(`${label}: the token lacks the scope (${error.message})`);
 					return;
 				}
@@ -315,7 +315,7 @@ describe('inwendo ERP node against a live ERP', { skip }, () => {
 
 	it('an ERP error surfaces as a node error', async () => {
 		await assert.rejects(runNode({ resource: 'company', operation: 'get', companyId: '999999999' }), (error) => {
-			assert.match(error.message, /inwendo ERP error 404/);
+			assert.match(error.message, /vynst error 404/);
 			assert.match(error.description, /data not found or missing access rights/);
 			return true;
 		});

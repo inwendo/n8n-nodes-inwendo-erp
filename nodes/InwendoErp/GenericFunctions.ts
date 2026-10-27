@@ -89,14 +89,14 @@ export function toNodeApiError(node: ReturnType<InwendoErpContext['getNode']>, e
 	const setting = featureDisabledSetting(code, details);
 	if (setting) {
 		return new NodeApiError(node, error as JsonObject, {
-			message: `inwendo ERP: this function is switched off (ERP setting "${setting}")`,
+			message: `vynst: this function is switched off (ERP setting "${setting}")`,
 			description:
 				`Enable the setting "${setting}" in the ERP (Settings) to use this operation. ` +
 				`ERP answer: ${code ?? ''} ${details ?? ''}`.trim(),
 		});
 	}
 	return new NodeApiError(node, error as JsonObject, {
-		message: `inwendo ERP error${code ? ` ${code}` : ''}`,
+		message: `vynst error${code ? ` ${code}` : ''}`,
 		description: details ? String(details) : undefined,
 	});
 }
@@ -138,7 +138,7 @@ async function buildOptions(
 }
 
 /**
- * Make an authenticated request to the inwendo ERP API.
+ * Make an authenticated request to the vynst API.
  */
 export async function inwendoErpApiRequest(
 	this: InwendoErpContext,
@@ -161,7 +161,7 @@ export async function inwendoErpApiRequest(
 }
 
 /**
- * Download a binary file (e.g. an invoice PDF) from the inwendo ERP API.
+ * Download a binary file (e.g. an invoice PDF) from the vynst API.
  */
 export async function inwendoErpApiRequestBinary(
 	this: IExecuteFunctions,
@@ -201,7 +201,7 @@ function itemsOf(responseBody: ErpResponse): IDataObject[] {
 const MAX_PAGES_WITHOUT_COUNT = 1000;
 
 /**
- * Fetch all items across paginated results from the inwendo ERP API.
+ * Fetch all items across paginated results from the vynst API.
  * Pages are 0-based. With `withMaxPageNumber` the ERP reports the number of
  * pages in the X-IW-MAX-PAGES header; without a usable count the pages are
  * read until one comes back empty.
