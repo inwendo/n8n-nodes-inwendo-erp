@@ -25,15 +25,15 @@ interface LockDefinition {
  */
 export class InwendoErpLockTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'inwendo ERP Lock Trigger',
+		displayName: 'vynst (inwendo ERP) Lock Trigger',
 		name: 'inwendoErpLockTrigger',
-		icon: 'file:../../icons/inwendo.png',
+		icon: { light: 'file:../../icons/vynst.svg', dark: 'file:../../icons/vynst.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{"locks: " + ($parameter["locks"]?.lock?.length ?? 0)}}',
 		description: 'Starts the workflow when the inwendo ERP opens or locks one of the locks this workflow offers',
 		defaults: {
-			name: 'inwendo ERP Lock Trigger',
+			name: 'vynst (inwendo ERP) Lock Trigger',
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -87,7 +87,7 @@ export class InwendoErpLockTrigger implements INodeType {
 								type: 'string',
 								default: '',
 								placeholder: 'front_door',
-								description: 'Unique within this trigger (letters, digits, _ . : -); links the lock to its ERP smart lock',
+								description: 'Unique within this trigger (letters, digits, _ . : -); links the lock to its ERP smart lock.',
 							},
 							{
 								displayName: 'Name in ERP',
@@ -117,13 +117,13 @@ export class InwendoErpLockTrigger implements INodeType {
 				default: 'onReceived',
 				options: [
 					{
-						name: 'Report Success When the Command Arrives',
-						value: 'onReceived',
-					},
-					{
 						name: 'Answer With the Last Node',
 						value: 'lastNode',
 						description: 'The first item of the last node must contain "success" (true / false), optionally "state"',
+					},
+					{
+						name: 'Report Success When the Command Arrives',
+						value: 'onReceived',
 					},
 				],
 			},
@@ -169,7 +169,7 @@ export class InwendoErpLockTrigger implements INodeType {
 						unlock_method: lock.unlockMethod === 'qr_code' ? 'qr_code' : 'remote',
 					})),
 				});
-				staticData.connectionId = response?.connection_id;
+				staticData.connectionId = (response as IDataObject | undefined)?.connection_id;
 				return true;
 			},
 
@@ -184,8 +184,11 @@ export class InwendoErpLockTrigger implements INodeType {
 						instance_id: staticData.instanceId as string,
 						secret: staticData.secret as string,
 					});
-				} catch {
+				} catch (error) {
 					// do not block the deactivation
+					this.logger.warn(
+						`inwendo ERP Lock Trigger: unregistering the locks failed: ${(error as Error).message}`,
+					);
 				}
 				return true;
 			},

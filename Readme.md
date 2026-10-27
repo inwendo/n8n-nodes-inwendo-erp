@@ -1,19 +1,20 @@
 # n8n-nodes-inwendo-erp
 
-An [n8n](https://n8n.io/) community node package for the [inwendo ERP](https://www.inwendo.de/) / vynst.
+An [n8n](https://n8n.io/) community node package for [vynst (inwendo ERP)](https://vynst.de/), the
+management software for clubs, associations and organizations by [inwendo](https://www.inwendo.de/).
 Read, create and update ERP data from n8n workflows, start workflows on ERP events (entity changes,
 timed booking events, door openings, check-ins) and offer locks of a workflow to the ERP.
 
 ## Features
 
-- **inwendo ERP** action node with 23 resources: CRM, tickets (with SLA state), time, billing,
+- **vynst (inwendo ERP)** action node with 23 resources: CRM, tickets (with SLA state), time, billing,
   bookings and events, inventory loans, shift plan, volunteer hours and helper shifts, membership
   pauses, general meetings, occupancy, usage counters, notifications (push to the vynst app,
   e-mail, SMS, …), smart locks, webhooks and a generic API request. Usable as a tool by AI agents.
-- **inwendo ERP Trigger**: starts a workflow when an entity is created, updated or deleted, and on
+- **vynst (inwendo ERP) Trigger**: starts a workflow when an entity is created, updated or deleted, and on
   **timed booking events** (lead time before a booking, start, end, lag time after it). The ERP
   webhook is registered and removed automatically.
-- **inwendo ERP Lock Trigger**: locks of a workflow (relay, Shelly, …) become ERP smart locks that
+- **vynst (inwendo ERP) Lock Trigger**: locks of a workflow (relay, Shelly, …) become ERP smart locks that
   members open with the ERP's access rules.
 - [Workflow templates](#workflow-templates) to import: ticket from e-mail or form, new booking to
   Slack / Teams, overdue inventory loans, access outside a booking, monthly usage counter report,
@@ -28,11 +29,12 @@ timed booking events, door openings, check-ins) and offer locks of a workflow to
 - [Credentials](#credentials)
 - [API token scopes](#api-token-scopes)
 - [ERP settings (feature switches)](#erp-settings-feature-switches)
-- [inwendo ERP (action node)](#inwendo-erp-action-node)
-- [inwendo ERP Trigger](#inwendo-erp-trigger)
-- [inwendo ERP Lock Trigger](#inwendo-erp-lock-trigger)
+- [Action node](#action-node)
+- [Trigger](#trigger)
+- [Lock Trigger](#lock-trigger)
 - [Workflow templates](#workflow-templates)
 - [Development and tests](#development-and-tests)
+- [Releases](#releases)
 - [API endpoints](#api-endpoints)
 
 ## Requirements
@@ -57,7 +59,8 @@ n8n requires for verified community nodes.
 3. Enter `n8n-nodes-inwendo-erp`
 4. Agree to the risks and click **Install**
 
-The nodes appear as *inwendo ERP*, *inwendo ERP Trigger* and *inwendo ERP Lock Trigger*.
+The nodes appear as *vynst (inwendo ERP)*, *vynst (inwendo ERP) Trigger* and
+*vynst (inwendo ERP) Lock Trigger*. Search for "vynst" or "inwendo" in the nodes panel.
 
 ### Self-hosted without the UI
 
@@ -81,7 +84,7 @@ npm link n8n-nodes-inwendo-erp
 
 ## Credentials
 
-Create an **inwendo ERP API** credential:
+Create a **Vynst (Inwendo ERP) API** credential:
 
 - **ERP Host URL**: the base URL of your ERP instance (e.g. `https://demo.iw-erp.de`)
 - **API Token (JWT)**: an API access token of the ERP
@@ -147,7 +150,7 @@ then fails with
 | General Meeting | `inwendo_crm_general_meeting_enabled` |
 | Ticket SLA fields | `customer_panel_ticket_sla_enabled` (without it tickets have no `sla`) |
 
-## inwendo ERP (action node)
+## Action node
 
 | Resource | Operations |
 |---|---|
@@ -310,7 +313,7 @@ itself. **Unlock / Lock / Status** act with the rights of the token's user (like
 Any method on any ERP endpoint, with query parameters and a JSON body, for everything the
 resources do not cover yet.
 
-## inwendo ERP Trigger
+## Trigger
 
 Starts the workflow on ERP events. Pick an **Entity Type** and an **Action**:
 
@@ -421,7 +424,7 @@ ERP** off and create the `RegisteredWebhook` in the ERP yourself:
 - `databaseAction`: `create`, `update`, `delete` or a timed action (`booking_start`, …)
 - optionally `notificationClientToken`, with the same value in the trigger's **Webhook Token**
 
-## inwendo ERP Lock Trigger
+## Lock Trigger
 
 Locks of an n8n workflow become ERP smart locks, so the ERP can open them:
 
@@ -462,8 +465,9 @@ channels / IDs named in the sticky note and activate.
 
 ```bash
 npm ci
-npm run lint        # eslint
-npm run build       # tsc + icons
+npm run lint        # n8n-node lint (the rules n8n checks for verified community nodes)
+npm run build       # n8n-node build (tsc + icons)
+npm run dev         # n8n-node dev: starts a local n8n with these nodes and rebuilds on change
 npm test            # build + offline unit tests (test/unit)
 npm run test:e2e    # build + end-to-end tests against a live ERP (test/e2e)
 ```
@@ -488,6 +492,14 @@ Layout: `nodes/InwendoErp/InwendoErp.node.ts` (action node, CRUD resources),
 `ResourceActions.ts` (the action resources), `descriptions/` (parameters per resource),
 `GenericFunctions.ts` (requests, pagination, errors), `InwendoErpTrigger.node.ts`,
 `InwendoErpLockTrigger.node.ts` + `LockProtocol.ts`, `credentials/`, `templates/`, `test/`.
+
+## Releases
+
+Releases are published to npm only from GitHub Actions with an
+[npm provenance](https://docs.npmjs.com/generating-provenance-statements) statement, as n8n requires
+for verified community nodes. Run `npm run release` locally: it lints, builds, asks for the version,
+updates the changelog, commits, tags and pushes. The tag starts `.github/workflows/publish.yml`,
+which publishes the package (npm Trusted Publishing, or an `NPM_TOKEN` secret as fallback).
 
 ## API endpoints
 

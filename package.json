@@ -1,38 +1,47 @@
 {
 	"name": "n8n-nodes-inwendo-erp",
 	"version": "0.6.0",
-	"description": "n8n community node for inwendo ERP integration",
+	"description": "n8n community nodes for vynst (inwendo ERP): members, bookings, events, tickets, invoices and smart locks",
 	"keywords": [
-		"n8n-community-node-package"
+		"n8n-community-node-package",
+		"vynst",
+		"inwendo",
+		"erp",
+		"club-management"
 	],
 	"license": "MIT",
-	"homepage": "https://github.com/inwendo/n8n-nodes-inwendo-erp",
+	"homepage": "https://developer.vynst.de/en/integrations/n8n/",
 	"engines": {
 		"node": ">=20.19"
 	},
 	"author": {
-		"name": "inwendo GmbH"
+		"name": "inwendo GmbH",
+		"email": "enno@inwendo.de"
 	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/inwendo/n8n-nodes-inwendo-erp.git"
 	},
 	"scripts": {
-		"build": "tsc && gulp build:icons",
-		"dev": "tsc --watch",
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
 		"format": "prettier nodes credentials --write",
-		"lint": "eslint nodes credentials package.json",
-		"lintfix": "eslint nodes credentials package.json --fix",
-		"prepublishOnly": "npm run build",
-		"test:e2e": "npm run build && node --test \"test/e2e/*.test.js\"",
-		"test": "npm run build && node --test \"test/unit/*.test.js\""
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease",
+		"test": "npm run build && node --test \"test/unit/*.test.js\"",
+		"test:e2e": "npm run build && node --test \"test/e2e/*.test.js\""
 	},
 	"files": [
 		"dist",
-		"templates"
+		"templates",
+		"!dist/**/*.tsbuildinfo"
 	],
 	"n8n": {
 		"n8nNodesApiVersion": 1,
+		"strict": true,
 		"credentials": [
 			"dist/credentials/InwendoErpApi.credentials.js"
 		],
@@ -43,14 +52,13 @@
 		]
 	},
 	"devDependencies": {
+		"@n8n/node-cli": "^0.54.3",
 		"@types/node": "^18.19.130",
-		"@typescript-eslint/eslint-plugin": "^7.18.0",
-		"@typescript-eslint/parser": "^7.0.0",
-		"eslint": "^8.56.0",
-		"gulp": "^5.0.1",
+		"eslint": "^9.39.4",
 		"n8n-workflow": ">=1.0.0",
-		"prettier": "^3.2.0",
-		"typescript": "^5.3.0"
+		"prettier": "^3.8.3",
+		"release-it": "^20.2.0",
+		"typescript": "^5.9.3"
 	},
 	"peerDependencies": {
 		"n8n-workflow": "*"

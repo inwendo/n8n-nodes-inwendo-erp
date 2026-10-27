@@ -102,8 +102,8 @@ export const smartLockFields: INodeProperties[] = [
 			},
 		},
 		options: [
-			{ name: 'Detect', value: 'auto', description: 'App QR code, member card QR or card number' },
 			{ name: 'App QR Code', value: 'access_code', description: 'The QR code the app shows for this lock' },
+			{ name: 'Detect', value: 'auto', description: 'App QR code, member card QR or card number' },
 			{ name: 'Digital Member Card (QR)', value: 'member_card' },
 			{ name: 'RFID / Chip Card Number', value: 'card', description: 'The member card number stored at the person' },
 		],

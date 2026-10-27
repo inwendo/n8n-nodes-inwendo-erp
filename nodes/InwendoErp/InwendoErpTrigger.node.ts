@@ -1,6 +1,7 @@
 import type {
 	IDataObject,
 	IHookFunctions,
+	NodeApiError,
 	INodeType,
 	INodeTypeDescription,
 	IWebhookFunctions,
@@ -9,7 +10,7 @@ import type {
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 import { randomBytes } from 'crypto';
 
-import { featureDisabledSetting, inwendoErpApiRequest } from './GenericFunctions';
+import { asNodeError, featureDisabledSetting, inwendoErpApiRequest } from './GenericFunctions';
 
 /** Timed booking events (ERP setting integration_booking_timed_events_enabled). */
 export const TIMED_BOOKING_ACTIONS = ['booking_pre_start', 'booking_start', 'booking_end', 'booking_post_end'];
@@ -57,15 +58,15 @@ export function triggerOutput(body: IDataObject): IDataObject {
 
 export class InwendoErpTrigger implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'inwendo ERP Trigger',
+		displayName: 'vynst (inwendo ERP) Trigger',
 		name: 'inwendoErpTrigger',
-		icon: 'file:../../icons/inwendo.png',
+		icon: { light: 'file:../../icons/vynst.svg', dark: 'file:../../icons/vynst.dark.svg' },
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["entityType"] + " " + $parameter["action"]}}',
 		description: 'Starts the workflow when an inwendo ERP event occurs via webhook',
 		defaults: {
-			name: 'inwendo ERP Trigger',
+			name: 'vynst (inwendo ERP) Trigger',
 		},
 		inputs: [],
 		outputs: [NodeConnectionTypes.Main],
@@ -116,9 +117,9 @@ export class InwendoErpTrigger implements INodeType {
 				options: [
 					{ name: 'All', value: 'all' },
 					{ name: 'Booking', value: 'BaseBooking' },
+					{ name: 'Check-In (Attendance List Entry)', value: 'AttendanceListEntry' },
 					{ name: 'Company', value: 'CRMCompany' },
 					{ name: 'Event', value: 'BaseEvent' },
-					{ name: 'Check-In (Attendance List Entry)', value: 'AttendanceListEntry' },
 					{ name: 'Event Sign-Up', value: 'BaseEventSignUp' },
 					{ name: 'General Meeting Participant', value: 'GeneralMeetingParticipant' },
 					{ name: 'Helper Shift Assignment', value: 'VolunteerShiftAssignment' },
@@ -150,26 +151,39 @@ export class InwendoErpTrigger implements INodeType {
 				type: 'options',
 				options: [
 					{ name: 'All', value: 'all' },
-					{ name: 'Create', value: 'create' },
-					{ name: 'Update', value: 'update' },
-					{ name: 'Delete', value: 'delete' },
-					{
-						name: 'Booking: Pre-Start (Lead Time)',
-						value: 'booking_pre_start',
-						description: 'The lead time before a booking starts (e.g. 30 minutes before: heating on, open the door)',
-					},
-					{ name: 'Booking: Start', value: 'booking_start', description: 'A booking starts' },
-					{ name: 'Booking: End', value: 'booking_end', description: 'A booking ends' },
-					{
-						name: 'Booking: Post-End',
-						value: 'booking_post_end',
-						description: 'The lag time after a booking ended (e.g. 15 minutes after: lights off, lock the door)',
-					},
 					{
 						name: 'Booking: All Timed Events',
 						value: 'booking_timed',
 						description: 'Pre-start, start, end and post-end of every booking',
+						action: 'On every timed booking event',
 					},
+					{
+						name: 'Booking: End',
+						value: 'booking_end',
+						description: 'A booking ends',
+						action: 'On booking end',
+					},
+					{
+						name: 'Booking: Post-End',
+						value: 'booking_post_end',
+						description: 'The lag time after a booking ended (e.g. 15 minutes after: lights off, lock the door)',
+						action: 'On booking post end',
+					},
+					{
+						name: 'Booking: Pre-Start (Lead Time)',
+						value: 'booking_pre_start',
+						description: 'The lead time before a booking starts (e.g. 30 minutes before: heating on, open the door)',
+						action: 'On booking pre start',
+					},
+					{
+						name: 'Booking: Start',
+						value: 'booking_start',
+						description: 'A booking starts',
+						action: 'On booking start',
+					},
+					{ name: 'Create', value: 'create' },
+					{ name: 'Delete', value: 'delete' },
+					{ name: 'Update', value: 'update' },
 				],
 				default: 'all',
 				description:
@@ -275,14 +289,11 @@ export class InwendoErpTrigger implements INodeType {
 					webhook_token: token,
 				};
 
-				let response: any;
+				let response: IDataObject;
 				try {
-					response = await inwendoErpApiRequest.call(this, 'POST', '/api/n8n/webhook', body);
+					response = (await inwendoErpApiRequest.call(this, 'POST', '/api/n8n/webhook', body)) as IDataObject;
 				} catch (error) {
-					if (timed) {
-						throw timedRegistrationError(this, error);
-					}
-					throw error;
+					throw timed ? timedRegistrationError(this, error) : asNodeError(this.getNode(), error);
 				}
 
 				const webhookId = response?.webhook_id;
@@ -326,6 +337,9 @@ export class InwendoErpTrigger implements INodeType {
 					// error). Keep the stored static data so the next
 					// deactivation can retry cleanup, and do not block
 					// workflow deactivation.
+					this.logger.warn(
+						`inwendo ERP Trigger: removing the webhook failed: ${(error as Error).message}`,
+					);
 					return true;
 				}
 
@@ -409,8 +423,8 @@ export class InwendoErpTrigger implements INodeType {
  * A failed registration of timed booking events: the setting is off, or the ERP is too old to
  * know the timed database actions.
  */
-function timedRegistrationError(ctx: IHookFunctions, error: unknown): Error {
-	const err = error as any;
+function timedRegistrationError(ctx: IHookFunctions, error: unknown): NodeApiError | NodeOperationError {
+	const err = error as { description?: unknown; message?: unknown } | undefined;
 	const description = String(err?.description ?? '');
 	const setting = featureDisabledSetting(undefined, description) ?? featureDisabledSetting(undefined, err?.message);
 	if (setting || /switched off/.test(String(err?.message ?? ''))) {
@@ -427,5 +441,5 @@ function timedRegistrationError(ctx: IHookFunctions, error: unknown): Error {
 			{ description },
 		);
 	}
-	return err instanceof Error ? err : new Error(String(error));
+	return asNodeError(ctx.getNode(), error);
 }

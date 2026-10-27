@@ -13,7 +13,7 @@ export const notificationOperations: INodeProperties[] = [
 		displayOptions: { show: { resource: [R] } },
 		options: [
 			{
-				name: 'Get Many Mass Notifications',
+				name: 'Get Many',
 				value: 'getAll',
 				description: 'Get the mass notifications sent so far',
 				action: 'Get many mass notifications',

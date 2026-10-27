@@ -2,13 +2,15 @@ import {
 	IAuthenticateGeneric,
 	ICredentialTestRequest,
 	ICredentialType,
+	Icon,
 	INodeProperties,
 } from 'n8n-workflow';
 
 export class InwendoErpApi implements ICredentialType {
 	name = 'inwendoErpApi';
-	displayName = 'inwendo ERP API';
-	documentationUrl = 'https://github.com/inwendo/n8n-nodes-inwendo-erp';
+	displayName = 'Vynst (Inwendo ERP) API';
+	icon: Icon = { light: 'file:../icons/vynst.svg', dark: 'file:../icons/vynst.dark.svg' };
+	documentationUrl = 'https://developer.vynst.de/en/integrations/n8n/';
 	properties: INodeProperties[] = [
 		{
 			displayName:

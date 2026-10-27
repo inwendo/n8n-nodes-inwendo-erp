@@ -135,8 +135,14 @@ export const projectFields: INodeProperties[] = [
 		},
 		options: [
 			{
-				displayName: 'Description',
-				name: 'description',
+				displayName: 'Archived',
+				name: 'archived',
+				type: 'boolean',
+				default: false,
+			},
+			{
+				displayName: 'Category ID',
+				name: 'category',
 				type: 'string',
 				default: '',
 			},
@@ -148,8 +154,20 @@ export const projectFields: INodeProperties[] = [
 				description: 'ID of the associated company',
 			},
 			{
-				displayName: 'Category ID',
-				name: 'category',
+				displayName: 'Description',
+				name: 'description',
+				type: 'string',
+				default: '',
+			},
+			{
+				displayName: 'End',
+				name: 'end',
+				type: 'dateTime',
+				default: '',
+			},
+			{
+				displayName: 'Invoice Email',
+				name: 'invoiceEmail',
 				type: 'string',
 				default: '',
 			},
@@ -160,9 +178,9 @@ export const projectFields: INodeProperties[] = [
 				default: '',
 			},
 			{
-				displayName: 'Invoice Email',
-				name: 'invoiceEmail',
-				type: 'string',
+				displayName: 'Start',
+				name: 'start',
+				type: 'dateTime',
 				default: '',
 			},
 			{
@@ -170,24 +188,6 @@ export const projectFields: INodeProperties[] = [
 				name: 'timeReportEmail',
 				type: 'string',
 				default: '',
-			},
-			{
-				displayName: 'Start',
-				name: 'start',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'End',
-				name: 'end',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'Archived',
-				name: 'archived',
-				type: 'boolean',
-				default: false,
 			},
 			{
 				displayName: 'Visible for Customer',
@@ -215,8 +215,32 @@ export const projectFields: INodeProperties[] = [
 		},
 		options: [
 			{
-				displayName: 'Name',
-				name: 'name',
+				displayName: 'Archived',
+				name: 'archived',
+				type: 'boolean',
+				default: false,
+			},
+			{
+				displayName: 'Billed',
+				name: 'billed',
+				type: 'dateTime',
+				default: '',
+			},
+			{
+				displayName: 'Category ID',
+				name: 'category',
+				type: 'string',
+				default: '',
+			},
+			{
+				displayName: 'Closed',
+				name: 'closed',
+				type: 'dateTime',
+				default: '',
+			},
+			{
+				displayName: 'Company ID',
+				name: 'company',
 				type: 'string',
 				default: '',
 			},
@@ -227,14 +251,20 @@ export const projectFields: INodeProperties[] = [
 				default: '',
 			},
 			{
-				displayName: 'Company ID',
-				name: 'company',
+				displayName: 'End',
+				name: 'end',
+				type: 'dateTime',
+				default: '',
+			},
+			{
+				displayName: 'Invoice Email',
+				name: 'invoiceEmail',
 				type: 'string',
 				default: '',
 			},
 			{
-				displayName: 'Category ID',
-				name: 'category',
+				displayName: 'Name',
+				name: 'name',
 				type: 'string',
 				default: '',
 			},
@@ -245,9 +275,9 @@ export const projectFields: INodeProperties[] = [
 				default: '',
 			},
 			{
-				displayName: 'Invoice Email',
-				name: 'invoiceEmail',
-				type: 'string',
+				displayName: 'Start',
+				name: 'start',
+				type: 'dateTime',
 				default: '',
 			},
 			{
@@ -255,36 +285,6 @@ export const projectFields: INodeProperties[] = [
 				name: 'timeReportEmail',
 				type: 'string',
 				default: '',
-			},
-			{
-				displayName: 'Start',
-				name: 'start',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'End',
-				name: 'end',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'Billed',
-				name: 'billed',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'Closed',
-				name: 'closed',
-				type: 'dateTime',
-				default: '',
-			},
-			{
-				displayName: 'Archived',
-				name: 'archived',
-				type: 'boolean',
-				default: false,
 			},
 			{
 				displayName: 'Visible for Customer',

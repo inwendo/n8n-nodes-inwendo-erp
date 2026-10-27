@@ -1,13 +1,16 @@
 import type {
 	IDataObject,
 	IExecuteFunctions,
+	IHttpRequestMethods,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+import type { ErpResponse } from './GenericFunctions';
 import {
+	asNodeError,
 	inwendoErpApiRequest,
 	inwendoErpApiRequestAllItems,
 	inwendoErpApiRequestBinary,
@@ -118,17 +121,24 @@ const RESOURCE_ID_FIELDS: Record<string, string> = {
 	smartLock: 'smartLockId',
 };
 
+/** n8n items carry an object; plain ERP answers (a count, an id) are wrapped as { data }. */
+function toJson(value: unknown): IDataObject {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+		? (value as IDataObject)
+		: { data: value as IDataObject[keyof IDataObject] };
+}
+
 export class InwendoErp implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'inwendo ERP',
+		displayName: 'vynst (inwendo ERP)',
 		name: 'inwendoErp',
-		icon: 'file:../../icons/inwendo.png',
+		icon: { light: 'file:../../icons/vynst.svg', dark: 'file:../../icons/vynst.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Interact with the inwendo ERP API',
 		defaults: {
-			name: 'inwendo ERP',
+			name: 'vynst (inwendo ERP)',
 		},
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
@@ -184,11 +194,11 @@ export class InwendoErp implements INodeType {
 					},
 				},
 				options: [
+					{ name: 'DELETE', value: 'DELETE' },
 					{ name: 'GET', value: 'GET' },
+					{ name: 'PATCH', value: 'PATCH' },
 					{ name: 'POST', value: 'POST' },
 					{ name: 'PUT', value: 'PUT' },
-					{ name: 'PATCH', value: 'PATCH' },
-					{ name: 'DELETE', value: 'DELETE' },
 				],
 				default: 'GET',
 				description: 'The HTTP method to use',
@@ -217,7 +227,8 @@ export class InwendoErp implements INodeType {
 						httpMethod: ['POST', 'PUT', 'PATCH'],
 					},
 				},
-				default: '',
+				default: '{}',
+				required: true,
 				description: 'The request body as JSON',
 			},
 			{
@@ -336,14 +347,14 @@ export class InwendoErp implements INodeType {
 
 					const responseData = await inwendoErpApiRequest.call(
 						this,
-						method as any,
+						method as IHttpRequestMethods,
 						endpoint,
 						body,
 						qs,
 					);
-					returnData.push({
-						json: typeof responseData === 'object' ? responseData : { data: responseData },
-					});
+					for (const item of Array.isArray(responseData) ? responseData : [responseData]) {
+						returnData.push({ json: toJson(item), pairedItem: { item: i } });
+					}
 					continue;
 				}
 
@@ -360,10 +371,7 @@ export class InwendoErp implements INodeType {
 				if (ACTION_RESOURCES.includes(resource)) {
 					const result = await executeResourceAction.call(this, resource, operation, i);
 					for (const item of Array.isArray(result) ? result : [result]) {
-						returnData.push({
-							json: typeof item === 'object' && item !== null ? item : { data: item },
-							pairedItem: { item: i },
-						});
+						returnData.push({ json: toJson(item), pairedItem: { item: i } });
 					}
 					continue;
 				}
@@ -376,7 +384,7 @@ export class InwendoErp implements INodeType {
 					});
 				}
 
-				let responseData: any;
+				let responseData: ErpResponse;
 
 				switch (operation) {
 					case 'get': {
@@ -553,21 +561,15 @@ export class InwendoErp implements INodeType {
 				}
 
 				// Normalize response to array
-				if (Array.isArray(responseData)) {
-					for (const item of responseData) {
-						returnData.push({ json: item });
-					}
-				} else {
-					returnData.push({
-						json: typeof responseData === 'object' ? responseData : { data: responseData },
-					});
+				for (const item of Array.isArray(responseData) ? responseData : [responseData]) {
+					returnData.push({ json: toJson(item), pairedItem: { item: i } });
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message } });
+					returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: i } });
 					continue;
 				}
-				throw error;
+				throw asNodeError(this.getNode(), error, i);
 			}
 		}
 
@@ -580,7 +582,7 @@ export class InwendoErp implements INodeType {
  * token's user, written to the smart lock log), the smart lock log and the access check of a reader
  * (/api/n8n/smart_lock/check_access, same rules as the app).
  */
-async function executeSmartLockAction(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function executeSmartLockAction(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	if (operation === 'getLog') {
 		const qs: IDataObject = {};
 		const smartLockId = String(this.getNodeParameter('logSmartLockId', i, '') || '').trim();
