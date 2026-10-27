@@ -64,7 +64,7 @@ export class InwendoErpTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{$parameter["entityType"] + " " + $parameter["action"]}}',
-		description: 'Starts the workflow when a vynst event occurs via webhook',
+		description: 'Starts the workflow when a vynst (vynst (inwendo ERP)) event occurs via webhook',
 		defaults: {
 			name: 'vynst (inwendo ERP) Trigger',
 		},
@@ -91,12 +91,12 @@ export class InwendoErpTrigger implements INodeType {
 				type: 'boolean',
 				default: true,
 				description:
-					'Whether to automatically create the matching RegisteredWebhook in vynst when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid vynst API credentials must be configured on this node.',
+					'Whether to automatically create the matching RegisteredWebhook in vynst (vynst (inwendo ERP)) when this workflow is activated, and remove it when the workflow is deactivated. Disable if you prefer to manage the webhook manually in the ERP. When enabled, valid vynst (inwendo ERP) API credentials must be configured on this node.',
 			},
 			{
 				displayName:
 					'Auto-registration requires the JWT token configured above to have ' +
-					'Scope <b>Webhook</b> with <b>Write</b> access, and vynst ' +
+					'Scope <b>Webhook</b> with <b>Write</b> access, and vynst (vynst (inwendo ERP)) ' +
 					'instance must provide the dedicated <b>/api/n8n/webhook</b> ' +
 					'controller. Older ERP builds do not support this flow - turn ' +
 					'this toggle off and configure the webhook manually in the ERP UI. ' +
@@ -262,7 +262,7 @@ export class InwendoErpTrigger implements INodeType {
 				} catch {
 					throw new NodeOperationError(
 						this.getNode(),
-						'Auto Register Webhook in ERP is enabled but no vynst API credentials are configured on this trigger. Configure credentials on the node, or disable Auto Register Webhook in ERP to manage the webhook manually.',
+						'Auto Register Webhook in ERP is enabled but no vynst (inwendo ERP) API credentials are configured on this trigger. Configure credentials on the node, or disable Auto Register Webhook in ERP to manage the webhook manually.',
 					);
 				}
 
@@ -300,7 +300,7 @@ export class InwendoErpTrigger implements INodeType {
 				if (!webhookId) {
 					throw new NodeOperationError(
 						this.getNode(),
-						'vynst did not return a webhook id after registration',
+						'vynst (inwendo ERP) did not return a webhook id after registration',
 					);
 				}
 				staticData.webhookId = webhookId;
@@ -338,7 +338,7 @@ export class InwendoErpTrigger implements INodeType {
 					// deactivation can retry cleanup, and do not block
 					// workflow deactivation.
 					this.logger.warn(
-						`vynst Trigger: removing the webhook failed: ${(error as Error).message}`,
+						`vynst (inwendo ERP) Trigger: removing the webhook failed: ${(error as Error).message}`,
 					);
 					return true;
 				}
@@ -430,13 +430,13 @@ function timedRegistrationError(ctx: IHookFunctions, error: unknown): NodeApiErr
 	if (setting || /switched off/.test(String(err?.message ?? ''))) {
 		return new NodeOperationError(
 			ctx.getNode(),
-			`Timed booking events are switched off in vynst. Enable the ERP setting "${setting ?? TIMED_SETTING}".`,
+			`Timed booking events are switched off in vynst (vynst (inwendo ERP)). Enable the ERP setting "${setting ?? TIMED_SETTING}".`,
 		);
 	}
 	if (/database_action/.test(description)) {
 		return new NodeOperationError(
 			ctx.getNode(),
-			'This vynst installation does not support timed booking events yet (update the ERP, then enable the setting ' +
+			'This vynst (vynst (inwendo ERP)) installation does not support timed booking events yet (update the ERP, then enable the setting ' +
 				`"${TIMED_SETTING}").`,
 			{ description },
 		);

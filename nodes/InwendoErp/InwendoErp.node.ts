@@ -136,7 +136,7 @@ export class InwendoErp implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Interact with the vynst API',
+		description: 'Interact with vynst (vynst (inwendo ERP)) API',
 		defaults: {
 			name: 'vynst (inwendo ERP)',
 		},

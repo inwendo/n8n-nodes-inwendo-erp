@@ -31,7 +31,7 @@ export class InwendoErpLockTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{"locks: " + ($parameter["locks"]?.lock?.length ?? 0)}}',
-		description: 'Starts the workflow when vynst opens or locks one of the locks this workflow offers',
+		description: 'Starts the workflow when vynst (vynst (inwendo ERP)) opens or locks one of the locks this workflow offers',
 		defaults: {
 			name: 'vynst (inwendo ERP) Lock Trigger',
 		},
@@ -187,7 +187,7 @@ export class InwendoErpLockTrigger implements INodeType {
 				} catch (error) {
 					// do not block the deactivation
 					this.logger.warn(
-						`vynst Lock Trigger: unregistering the locks failed: ${(error as Error).message}`,
+						`vynst (inwendo ERP) Lock Trigger: unregistering the locks failed: ${(error as Error).message}`,
 					);
 				}
 				return true;

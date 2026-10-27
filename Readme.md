@@ -40,7 +40,7 @@ timed booking events, door openings, check-ins) and offer locks of a workflow to
 ## Requirements
 
 - n8n 1.85 or newer (for `NodeConnectionTypes`), including n8n 2.x; built against n8n-workflow 2.x
-- A vynst installation with the `/api/n8n/*` endpoints (`N8nWebhookController`) for the trigger's
+- A vynst (vynst (inwendo ERP)) installation with the `/api/n8n/*` endpoints (`N8nWebhookController`) for the trigger's
   auto-registration and the lock trigger. Older ERPs work with a manually created webhook
   ([Manual setup](#manual-setup-advanced)).
 - Timed booking events and the occupancy need an ERP that ships them (see
@@ -125,7 +125,7 @@ operations need *Write* (create) or *Edit* (change).
 | Webhook (action node) | Webhook and **Allow admin functions** |
 | Smart Lock: Check Access, Unlock, Lock, Status; Lock Trigger | Event (Write) |
 | Smart Lock: Get, Get Many, Get Log | Event and **Allow super admin functions** |
-| vynst Trigger (auto-registration) | Webhook (Write) |
+| vynst (inwendo ERP) Trigger (auto-registration) | Webhook (Write) |
 
 When the ERP rejects a request, the node error shows the ERP's error code and message
 (`X-IW-ERROR-CODE` / `X-IW-ERROR-JSON`).
@@ -137,7 +137,7 @@ off the ERP answers *feature disabled* (HTTP 400 with `X-IW-ERROR-CODE: 404` and
 `X-IW-ERROR-JSON: ["feature disabled: <setting>"]`, older functions with their own code); the node
 then fails with
 
-> vynst: this function is switched off (ERP setting "&lt;setting&gt;")
+> vynst (inwendo ERP): this function is switched off (ERP setting "&lt;setting&gt;")
 
 | Function | ERP setting |
 |---|---|

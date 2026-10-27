@@ -1,5 +1,5 @@
 {
-  "name": "vynst: new booking to Slack / Teams",
+  "name": "vynst (inwendo ERP): new booking to Slack / Teams",
   "nodes": [
     {
       "parameters": {
