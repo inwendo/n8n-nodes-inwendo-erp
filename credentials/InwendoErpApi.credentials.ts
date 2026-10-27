@@ -14,7 +14,7 @@ export class InwendoErpApi implements ICredentialType {
 	properties: INodeProperties[] = [
 		{
 			displayName:
-				'For webhook auto-registration (inwendo ERP Trigger) this token needs ' +
+				'For webhook auto-registration (vynst (inwendo ERP) Trigger) this token needs ' +
 				'Scope <b>Webhook</b> with <b>Write</b> access, and the ERP instance ' +
 				'must provide the <b>/api/n8n/webhook</b> endpoint (shipped with the ' +
 				'dedicated N8nWebhookController). ' +
@@ -30,7 +30,7 @@ export class InwendoErpApi implements ICredentialType {
 			default: '',
 			placeholder: 'https://demo.iw-erp.de',
 			required: true,
-			description: 'The base URL of your inwendo ERP instance (without trailing slash)',
+			description: 'The base URL of your vynst (inwendo ERP) installation (without trailing slash)',
 		},
 		{
 			displayName: 'API Token (JWT)',

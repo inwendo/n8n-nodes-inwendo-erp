@@ -1,5 +1,5 @@
 {
-  "name": "inwendo ERP: warning on access outside a booking",
+  "name": "vynst (inwendo ERP): warning on access outside a booking",
   "nodes": [
     {
       "parameters": {
