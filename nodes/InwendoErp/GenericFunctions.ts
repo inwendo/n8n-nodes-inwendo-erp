@@ -7,7 +7,10 @@ import type {
 	ILoadOptionsFunctions,
 	JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError } from 'n8n-workflow';
+import { NodeApiError, NodeOperationError } from 'n8n-workflow';
+
+/** A parsed ERP answer: an object or a list (callers still guard against plain values). */
+export type ErpResponse = IDataObject | IDataObject[];
 
 type InwendoErpContext = IExecuteFunctions | ILoadOptionsFunctions | IHookFunctions;
 
@@ -58,7 +61,14 @@ export function featureDisabledSetting(code: unknown, details: unknown): string 
 }
 
 function errorHeaders(error: unknown): Record<string, unknown> {
-	const err = error as any;
+	type WithHeaders = { headers?: Record<string, unknown> };
+	const err = error as
+		| (WithHeaders & {
+				response?: WithHeaders;
+				cause?: { response?: WithHeaders };
+				context?: { response?: WithHeaders };
+		  })
+		| undefined;
 	return (
 		err?.response?.headers ?? err?.cause?.response?.headers ?? err?.context?.response?.headers ?? err?.headers ?? {}
 	);
@@ -89,6 +99,18 @@ export function toNodeApiError(node: ReturnType<InwendoErpContext['getNode']>, e
 		message: `inwendo ERP error${code ? ` ${code}` : ''}`,
 		description: details ? String(details) : undefined,
 	});
+}
+
+/** Keeps n8n errors as they are and wraps anything else, so the UI always gets a node error. */
+export function asNodeError(
+	node: ReturnType<InwendoErpContext['getNode']>,
+	error: unknown,
+	itemIndex?: number,
+): NodeApiError | NodeOperationError {
+	if (error instanceof NodeApiError || error instanceof NodeOperationError) {
+		return error;
+	}
+	return new NodeOperationError(node, error instanceof Error ? error : String(error), { itemIndex });
 }
 
 async function buildOptions(
@@ -124,11 +146,15 @@ export async function inwendoErpApiRequest(
 	endpoint: string,
 	body?: IDataObject,
 	qs?: IDataObject,
-): Promise<any> {
+): Promise<ErpResponse> {
 	const options = await buildOptions.call(this, method, endpoint, body, qs);
 
 	try {
-		return await this.helpers.httpRequestWithAuthentication.call(this, 'inwendoErpApi', options);
+		return (await this.helpers.httpRequestWithAuthentication.call(
+			this,
+			'inwendoErpApi',
+			options,
+		)) as ErpResponse;
 	} catch (error) {
 		throw toNodeApiError(this.getNode(), error);
 	}
@@ -161,12 +187,12 @@ export async function inwendoErpApiRequestBinary(
 	}
 }
 
-function itemsOf(responseBody: any): any[] {
+function itemsOf(responseBody: ErpResponse): IDataObject[] {
 	if (Array.isArray(responseBody)) {
 		return responseBody;
 	}
 	if (responseBody && Array.isArray(responseBody.data)) {
-		return responseBody.data;
+		return responseBody.data as IDataObject[];
 	}
 	return [responseBody];
 }
@@ -185,8 +211,8 @@ export async function inwendoErpApiRequestAllItems(
 	method: IHttpRequestMethods,
 	endpoint: string,
 	qs?: IDataObject,
-): Promise<any[]> {
-	const allItems: any[] = [];
+): Promise<IDataObject[]> {
+	const allItems: IDataObject[] = [];
 	const queryParams: IDataObject = { ...(qs || {}), withMaxPageNumber: 'n8n' };
 	const options = await buildOptions.call(this, method, endpoint, undefined, queryParams);
 	options.returnFullResponse = true;
@@ -232,7 +258,7 @@ export async function inwendoErpApiRequestList(
 	qs: IDataObject,
 	returnAll: boolean,
 	limit: number,
-): Promise<any[]> {
+): Promise<IDataObject[]> {
 	if (returnAll) {
 		return await inwendoErpApiRequestAllItems.call(this, 'GET', endpoint, qs);
 	}

@@ -64,10 +64,10 @@ export const generalMeetingFields: INodeProperties[] = [
 		name: 'attendanceFilter',
 		type: 'options',
 		options: [
-			{ name: 'All', value: '' },
 			{ name: 'Absent', value: 'ABSENT' },
-			{ name: 'Online', value: 'ONLINE' },
+			{ name: 'All', value: '' },
 			{ name: 'On Site', value: 'ONSITE' },
+			{ name: 'Online', value: 'ONLINE' },
 		],
 		default: '',
 		displayOptions: { show: { resource: [R], operation: ['getParticipants'] } },
@@ -79,8 +79,8 @@ export const generalMeetingFields: INodeProperties[] = [
 		type: 'options',
 		options: [
 			{ name: 'Absent (Check Out)', value: 'ABSENT' },
-			{ name: 'Online', value: 'ONLINE' },
 			{ name: 'On Site', value: 'ONSITE' },
+			{ name: 'Online', value: 'ONLINE' },
 		],
 		default: 'ONSITE',
 		displayOptions: { show: { resource: [R], operation: ['checkIn'] } },

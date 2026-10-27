@@ -2,11 +2,20 @@
 	"node": "n8n-nodes-inwendo-erp.inwendoErp",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Business"],
+	"categories": [
+		"Productivity",
+		"Sales",
+		"Finance & Accounting"
+	],
 	"resources": {
 		"credentialDocumentation": [
 			{
-				"url": "https://github.com/inwendo/n8n-nodes-inwendo-erp"
+				"url": "https://developer.vynst.de/en/integrations/n8n/"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/inwendo/n8n-nodes-inwendo-erp#readme"
 			}
 		]
 	}

@@ -1,39 +1,49 @@
-name: Publish to npm
+# Publishes the package to npm when a version tag is pushed (`npm run release` creates it).
+#
+# n8n requires npm provenance for verified community nodes (since May 1 2026): the package must be
+# published from GitHub Actions, never from a local machine. Provenance needs `id-token: write`.
+#
+# One-time setup on npmjs.com (package settings → Publish access → Trusted Publishers):
+# GitHub Actions, owner `inwendo`, repository `n8n-nodes-inwendo-erp`, workflow `publish.yml`.
+# Fallback: a granular access token as repository secret NPM_TOKEN.
+
+name: Publish
 
 on:
-  release:
-    types: [published]
-
-permissions:
-  contents: read
-  # npm provenance (required for n8n verified community nodes since May 2026)
-  id-token: write
+  push:
+    tags:
+      - '*.*.*'
 
 jobs:
   publish:
+    name: Publish to npm
     runs-on: ubuntu-latest
+
+    permissions:
+      # Required to mint the OIDC token for trusted publishing and the provenance attestation.
+      id-token: write
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 'lts/*'
+          cache: 'npm'
           registry-url: https://registry.npmjs.org
+
+      # Trusted publishing (OIDC) needs npm 11.5.1 or newer; Node LTS may ship an older npm.
+      - run: npm install -g npm@^11.5.1
 
       - run: npm ci
 
-      - run: npm run lint
+      - run: npm test
 
-      - run: npm run build
-
-      - name: Verify dist files
+      - name: Release
+        # n8n-node release lints, builds and publishes with --provenance in CI.
         run: |
-          test -f dist/credentials/InwendoErpApi.credentials.js
-          test -f dist/nodes/InwendoErp/InwendoErp.node.js
-          test -f dist/nodes/InwendoErp/InwendoErpTrigger.node.js
-          test -f dist/nodes/InwendoErp/InwendoErp.node.json
-          test -f dist/icons/inwendo.png
-
-      - run: npm publish --provenance --access public
+          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          npm run release
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

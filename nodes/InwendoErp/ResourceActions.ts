@@ -1,6 +1,7 @@
 import type { IDataObject, IExecuteFunctions } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
+import type { ErpResponse } from './GenericFunctions';
 import { inwendoErpApiRequest, inwendoErpApiRequestList } from './GenericFunctions';
 
 /**
@@ -100,7 +101,7 @@ export function splitOccupancy(response: IDataObject): IDataObject[] {
 }
 
 /** Calls a list endpoint with the item's Return All / Limit. */
-async function list(this: IExecuteFunctions, i: number, endpoint: string, qs: IDataObject): Promise<any[]> {
+async function list(this: IExecuteFunctions, i: number, endpoint: string, qs: IDataObject): Promise<IDataObject[]> {
 	const returnAll = this.getNodeParameter('returnAll', i, false) as boolean;
 	const limit = returnAll ? 0 : (this.getNodeParameter('limit', i, 50) as number);
 	return await inwendoErpApiRequestList.call(this, endpoint, qs, returnAll, limit);
@@ -146,7 +147,7 @@ export async function executeResourceAction(
 				qs.bookable = bookables.join(',');
 			}
 			const response = await inwendoErpApiRequest.call(this, 'GET', '/api/event/bookable_occupancy', undefined, qs);
-			return splitOccupancy(response);
+			return splitOccupancy(response as IDataObject);
 		}
 		case 'usageCounter':
 			return await usageCounter.call(this, operation, i);
@@ -157,7 +158,7 @@ export async function executeResourceAction(
 }
 
 /** Inventory loans (ERP setting event_inventory_enabled, scope Event Booking). */
-async function inventoryLoan(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function inventoryLoan(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/event/inventory_loan';
 	switch (operation) {
 		case 'getAll': {
@@ -198,7 +199,7 @@ async function inventoryLoan(this: IExecuteFunctions, operation: string, i: numb
 }
 
 /** Shift plan (ERP settings shift_planning_enabled, shift_clocking_enabled). */
-async function shiftPlanEntry(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function shiftPlanEntry(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/time/shift_plan_entry';
 	switch (operation) {
 		case 'getOwn': {
@@ -239,7 +240,7 @@ async function shiftPlanEntry(this: IExecuteFunctions, operation: string, i: num
 }
 
 /** Volunteer hours (ERP setting volunteer_hours_enabled, scope CRM). */
-async function volunteerHourEntry(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function volunteerHourEntry(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/time/volunteer_hour_entry';
 	switch (operation) {
 		case 'getAll':
@@ -267,7 +268,7 @@ async function volunteerHourEntry(this: IExecuteFunctions, operation: string, i:
 }
 
 /** Helper shifts of the volunteer hours (ERP setting volunteer_hours_enabled, scope CRM). */
-async function helperShift(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function helperShift(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/time/volunteer_shift';
 	const assignments = '/api/time/volunteer_shift_assignment';
 	switch (operation) {
@@ -312,7 +313,7 @@ async function helperShift(this: IExecuteFunctions, operation: string, i: number
 }
 
 /** Membership pause requests (scope CRM). */
-async function membershipPause(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function membershipPause(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/crm/membership_pause_request';
 	switch (operation) {
 		case 'getAll':
@@ -333,7 +334,7 @@ async function membershipPause(this: IExecuteFunctions, operation: string, i: nu
 }
 
 /** General meetings (ERP setting inwendo_crm_general_meeting_enabled, scope CRM). */
-async function generalMeeting(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function generalMeeting(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/crm/general_meeting';
 	const participants = '/api/crm/general_meeting_participant';
 	switch (operation) {
@@ -372,7 +373,7 @@ async function generalMeeting(this: IExecuteFunctions, operation: string, i: num
 }
 
 /** Usage counters (meters) of bookables (scope Maintenance). */
-async function usageCounter(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function usageCounter(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	const base = '/api/event/base_bookable_usage_counter';
 	switch (operation) {
 		case 'getAll': {
@@ -394,7 +395,7 @@ async function usageCounter(this: IExecuteFunctions, operation: string, i: numbe
 }
 
 /** Notifications: mass notifications (scope Notification) and the token user's own notifications. */
-async function notification(this: IExecuteFunctions, operation: string, i: number): Promise<any> {
+async function notification(this: IExecuteFunctions, operation: string, i: number): Promise<ErpResponse> {
 	switch (operation) {
 		case 'getAll':
 			return await list.call(this, i, '/api/notification/mass_notification', {});
